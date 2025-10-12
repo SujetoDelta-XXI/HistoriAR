@@ -1,0 +1,60 @@
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+
+# Entornos
+.env
+.env.local
+.env.*.local
+
+# Compilaciones y cachés
+dist/
+build/
+tmp/
+temp/
+.cache/
+coverage/
+logs/
+*.log
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDEs y editores
+.vscode/
+.idea/
+*.swp
+
+# Tests
+jest-report/
+mocha-report/
+.nyc_output/
+
+# Archivos temporales
+*.tmp
+*.bak
+*.orig
+
+# Subidas o archivos generados
+uploads/
+public/uploads/
+storage/
+files/
+
+# PM2 o procesos
+pids
+*.pid
+*.seed
+
+# Docker
+docker-compose.override.yml
+
+# Otros
+*.tgz
