@@ -1,9 +1,12 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-const visitSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  monumentId: { type: mongoose.Schema.Types.ObjectId, ref: "Monument" },
-  date: { type: Date, default: Date.now },
+const VisitSchema = new mongoose.Schema({
+  userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  monumentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Monument', required: true },
+  date:       { type: Date, default: Date.now },
+  duration:   { type: Number },   // minutos
+  rating:     { type: Number, min: 1, max: 5 },
+  device:     { type: String }
 }, { timestamps: true });
 
-export default mongoose.model("Visit", visitSchema);
+export default mongoose.model('Visit', VisitSchema);
