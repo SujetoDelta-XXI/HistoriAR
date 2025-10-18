@@ -1,11 +1,12 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-export const connectDB = async () => {
+export async function connectDB(uri) {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ MongoDB conectado correctamente");
-  } catch (error) {
-    console.error("❌ Error al conectar a MongoDB:", error.message);
+    mongoose.set('strictQuery', true);
+    await mongoose.connect(uri, { dbName: 'historiar' });
+    console.log('✅ MongoDB Atlas conectado');
+  } catch (err) {
+    console.error('❌ Error conectando a MongoDB:', err.message);
     process.exit(1);
   }
-};
+}
