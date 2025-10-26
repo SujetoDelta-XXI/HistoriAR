@@ -1,0 +1,3 @@
+# Ignorar configuración local de editores
+.vscode/
+.kiro/

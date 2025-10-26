@@ -5,7 +5,7 @@ const HistoricalDataSchema = new mongoose.Schema({
   title:        { type: String, required: true },
   description:  { type: String },
   discoveryInfo:{ type: String },
-  oldImages:    [{ type: String }], // URLs Cloudinary
+  oldImages:    [{ type: String }], // URLs GCS
   activities:   [{ type: String }],
   sources:      [{ type: String }]
 }, { timestamps: { createdAt: true, updatedAt: true } });

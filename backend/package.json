@@ -1,18 +1,23 @@
 {
   "name": "historiar-backend",
   "version": "1.0.0",
-  "description": "API REST del proyecto HistoriAR (Node.js + Express + MongoDB + Cloudinary)",
+  "description": "API REST del proyecto HistoriAR (Node.js + Express + MongoDB + Google Cloud Storage)",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "setup:gcs": "node scripts/setup-gcs.js",
+    "migrate:gcs": "node scripts/migrate-to-gcs.js",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "keywords": [
     "historiar",
     "express",
     "mongodb",
-    "cloudinary",
+    "google-cloud-storage",
     "multer",
     "backend",
     "nodejs"
@@ -20,8 +25,8 @@
   "author": "Carlos Asparrín",
   "license": "MIT",
   "dependencies": {
+    "@google-cloud/storage": "^7.17.2",
     "bcryptjs": "^2.4.3",
-    "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -31,10 +36,13 @@
     "mongoose": "^8.6.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "multer-storage-cloudinary": "^4.0.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "vitest": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "supertest": "^6.3.3"
   },
   "engines": {
     "node": ">=18.0.0"

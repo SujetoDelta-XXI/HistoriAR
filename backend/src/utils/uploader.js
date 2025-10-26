@@ -1,24 +1,40 @@
 import multer from 'multer';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
-import cloudinary from '../config/cloudinary.js';
 
-// imágenes (jpg/png/webp)
-const imageStorage = new CloudinaryStorage({
-  cloudinary,
-  params: async () => ({
-    folder: 'historiar/images',
-    resource_type: 'image'
-  })
+// Configure multer to use memory storage for GCS uploads
+const storage = multer.memoryStorage();
+
+// Image upload configuration
+export const uploadImage = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit for images
+  },
+  fileFilter: (req, file, cb) => {
+    // Check if file is an image
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid image format. Only JPEG, PNG, and WebP are allowed'), false);
+    }
+  }
 });
 
-// modelos 3D / pesados (glb/gltf/usdz/pdf/video/etc)
-const modelStorage = new CloudinaryStorage({
-  cloudinary,
-  params: async () => ({
-    folder: 'historiar/models',
-    resource_type: 'auto'
-  })
+// 3D Model upload configuration
+export const uploadModel = multer({
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit for 3D models
+  },
+  fileFilter: (req, file, cb) => {
+    // Check if file is a 3D model
+    const allowedExtensions = ['.glb', '.gltf'];
+    const fileExtension = '.' + file.originalname.toLowerCase().split('.').pop();
+    
+    if (allowedExtensions.includes(fileExtension)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file format. Only GLB and GLTF files are allowed'), false);
+    }
+  }
 });
-
-export const uploadImage = multer({ storage: imageStorage });
-export const uploadModel = multer({ storage: modelStorage });

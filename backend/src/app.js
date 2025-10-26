@@ -12,6 +12,7 @@ import historicalRoutes from './routes/historicalData.routes.js';
 import visitRoutes from './routes/visits.routes.js';
 import quizRoutes from './routes/quizzes.routes.js';
 import uploadRoutes from './routes/uploads.routes.js';
+import healthRoutes from './routes/health.routes.js';
 
 config();
 
@@ -24,6 +25,7 @@ app.use(morgan('dev'));
 
 app.get('/', (_req, res) => res.json({ name: 'HistoriAR API', status: 'ok' }));
 
+app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/institutions', institutionRoutes);
