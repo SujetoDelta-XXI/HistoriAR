@@ -9,7 +9,7 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB limit
   }
 });
 
@@ -37,5 +37,68 @@ router.put('/:id',
 );
 
 router.delete('/:id', verifyToken, requireRole('admin'), deleteMonumentController);
+
+// Upload endpoints specifically for monuments
+router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    const gcsService = (await import('../services/gcsService.js')).default;
+    
+    // Validate image file
+    gcsService.validateImageFile(req.file);
+
+    // Upload to GCS
+    const result = await gcsService.uploadImage(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    );
+
+    res.json({
+      imageUrl: result.url,
+      filename: result.filename,
+      message: 'Image uploaded successfully'
+    });
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to upload image' 
+    });
+  }
+});
+
+router.post('/upload-model', verifyToken, requireRole('admin'), upload.single('model'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No 3D model file provided' });
+    }
+
+    const gcsService = (await import('../services/gcsService.js')).default;
+    
+    // Validate 3D model file
+    gcsService.validateModelFile(req.file);
+
+    // Upload to GCS
+    const result = await gcsService.uploadModel(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    );
+
+    res.json({
+      modelUrl: result.url,
+      filename: result.filename,
+      message: '3D model uploaded successfully'
+    });
+  } catch (error) {
+    console.error('3D model upload error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to upload 3D model' 
+    });
+  }
+});
 
 export default router;

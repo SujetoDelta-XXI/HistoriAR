@@ -18,21 +18,23 @@ class GCSService {
       // Generate unique filename
       const fileExtension = originalName.split('.').pop();
       const filename = `models/${uuidv4()}.${fileExtension}`;
-      
+
       // Create file reference
       const file = this.bucket.file(filename);
-      
+
       // Upload file
       await file.save(fileBuffer, {
         metadata: {
           contentType: mimeType,
         },
-        public: true, // Make file publicly accessible
       });
+
+      // File is automatically public due to bucket-level permissions
+      // No need to call makePublic() when UBLA is enabled
 
       // Generate public URL
       const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${filename}`;
-      
+
       return {
         url: publicUrl,
         filename: filename
@@ -55,21 +57,23 @@ class GCSService {
       // Generate unique filename
       const fileExtension = originalName.split('.').pop();
       const filename = `images/${uuidv4()}.${fileExtension}`;
-      
+
       // Create file reference
       const file = this.bucket.file(filename);
-      
+
       // Upload file
       await file.save(fileBuffer, {
         metadata: {
           contentType: mimeType,
         },
-        public: true, // Make file publicly accessible
       });
+
+      // File is automatically public due to bucket-level permissions
+      // No need to call makePublic() when UBLA is enabled
 
       // Generate public URL
       const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${filename}`;
-      
+
       return {
         url: publicUrl,
         filename: filename
@@ -121,11 +125,11 @@ class GCSService {
   validateModelFile(file) {
     const allowedMimeTypes = ['model/gltf-binary', 'model/gltf+json'];
     const allowedExtensions = ['.glb', '.gltf'];
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 100 * 1024 * 1024; // 100MB
 
     // Check file size
     if (file.size > maxSize) {
-      throw new Error('File size exceeds 50MB limit');
+      throw new Error('File size exceeds 100MB limit');
     }
 
     // Check file extension

@@ -17,22 +17,103 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockTimeLeft, setBlockTimeLeft] = useState(0);
   const { login, isLoading } = useAuth();
+
+  // Rate limiting: máximo 5 intentos, bloqueo de 5 minutos
+  const MAX_ATTEMPTS = 5;
+  const BLOCK_DURATION = 5 * 60 * 1000; // 5 minutos en ms
+
+  // Verificar si está bloqueado al cargar
+  useState(() => {
+    const blockData = localStorage.getItem('loginBlock');
+    if (blockData) {
+      const { timestamp, attempts } = JSON.parse(blockData);
+      const timeElapsed = Date.now() - timestamp;
+      
+      if (timeElapsed < BLOCK_DURATION && attempts >= MAX_ATTEMPTS) {
+        setIsBlocked(true);
+        setAttemptCount(attempts);
+        setBlockTimeLeft(Math.ceil((BLOCK_DURATION - timeElapsed) / 1000));
+        
+        // Countdown timer
+        const timer = setInterval(() => {
+          const newTimeLeft = Math.ceil((BLOCK_DURATION - (Date.now() - timestamp)) / 1000);
+          if (newTimeLeft <= 0) {
+            setIsBlocked(false);
+            setAttemptCount(0);
+            localStorage.removeItem('loginBlock');
+            clearInterval(timer);
+          } else {
+            setBlockTimeLeft(newTimeLeft);
+          }
+        }, 1000);
+        
+        return () => clearInterval(timer);
+      } else if (timeElapsed >= BLOCK_DURATION) {
+        // Bloqueo expirado, limpiar
+        localStorage.removeItem('loginBlock');
+      } else {
+        setAttemptCount(attempts);
+      }
+    }
+  }, []);
 
   /**
    * Envía el formulario y ejecuta el login del contexto
    * - Previene el submit por defecto
    * - Limpia errores anteriores
+   * - Implementa rate limiting
    * - Muestra errores provenientes del contexto
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     
+    if (isBlocked) {
+      setError(`Demasiados intentos fallidos. Intenta nuevamente en ${Math.ceil(blockTimeLeft / 60)} minutos.`);
+      return;
+    }
+    
     try {
       await login(email, password);
+      // Login exitoso, limpiar intentos
+      localStorage.removeItem('loginBlock');
+      setAttemptCount(0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      const newAttemptCount = attemptCount + 1;
+      setAttemptCount(newAttemptCount);
+      
+      // Guardar intentos en localStorage
+      localStorage.setItem('loginBlock', JSON.stringify({
+        timestamp: Date.now(),
+        attempts: newAttemptCount
+      }));
+      
+      if (newAttemptCount >= MAX_ATTEMPTS) {
+        setIsBlocked(true);
+        setBlockTimeLeft(BLOCK_DURATION / 1000);
+        setError(`Demasiados intentos fallidos. Cuenta bloqueada por 5 minutos.`);
+        
+        // Iniciar countdown
+        const timer = setInterval(() => {
+          setBlockTimeLeft(prev => {
+            if (prev <= 1) {
+              setIsBlocked(false);
+              setAttemptCount(0);
+              localStorage.removeItem('loginBlock');
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        const remainingAttempts = MAX_ATTEMPTS - newAttemptCount;
+        setError(`${err instanceof Error ? err.message : 'Error al iniciar sesión'}. Te quedan ${remainingAttempts} intentos.`);
+      }
     }
   };
 
@@ -90,27 +171,28 @@ function LoginForm() {
               )}
 
               {/* Botón de envío con indicador de carga */}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || isBlocked}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Iniciando sesión...
                   </>
+                ) : isBlocked ? (
+                  `Bloqueado (${Math.ceil(blockTimeLeft / 60)}m ${blockTimeLeft % 60}s)`
                 ) : (
                   'Iniciar Sesión'
                 )}
               </Button>
+
+              {/* Mostrar intentos restantes */}
+              {attemptCount > 0 && attemptCount < MAX_ATTEMPTS && !isBlocked && (
+                <p className="text-sm text-amber-600 text-center">
+                  Intentos restantes: {MAX_ATTEMPTS - attemptCount}
+                </p>
+              )}
             </form>
 
-            {/* Credenciales de prueba visibles para QA/demostración */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-medium text-blue-900 mb-2">Cuentas de prueba:</h3>
-              <div className="space-y-1 text-sm text-blue-800">
-                <div><strong>Super Admin:</strong> admin@historiar.pe / admin123</div>
-                <div><strong>Editor:</strong> editor@historiar.pe / editor123</div>
-                <div><strong>Analista:</strong> analista@historiar.pe / analista123</div>
-              </div>
-            </div>
+
           </CardContent>
         </Card>
 

@@ -7,52 +7,104 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simular verificación de sesión existente
-    const token = localStorage.getItem('histor_ar_token');
-    if (token) {
-      // En producción, verificar token con backend
-      const mockUser = {
-        id: '1',
-        email: 'admin@historiar.pe',
-        name: 'Administrador',
-        role: 'super_admin'
-      };
-      setUser(mockUser);
-    }
-    setIsLoading(false);
+    // Verificar sesión existente
+    const validateSession = async () => {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      
+      if (token && userData) {
+        try {
+          const user = JSON.parse(userData);
+          
+          // Solo permitir usuarios admin
+          if (user.role !== 'admin') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setIsLoading(false);
+            return;
+          }
+
+          // Validar token contra el servidor
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+          const response = await fetch(`${API_BASE_URL}/auth/validate`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const validatedUser = await response.json();
+            // Verificar que sigue siendo admin
+            if (validatedUser.role === 'admin') {
+              setUser(validatedUser);
+            } else {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+            }
+          } else {
+            // Token inválido o expirado
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
+        } catch (error) {
+          // Error al validar, limpiar sesión
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+      setIsLoading(false);
+    };
+
+    validateSession();
   }, []);
 
   const login = useCallback(async (email, password) => {
     setIsLoading(true);
 
-    // Simulación de login - en producción usar Supabase o backend real
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (email === 'admin@historiar.pe' && password === 'admin123') {
-      const newUser = {
-        id: '1',
-        email,
-        name: 'Administrador Principal',
-        role: 'super_admin'
-      };
-      setUser(newUser);
-      localStorage.setItem('histor_ar_token', 'mock_token');
-    } else {
-      throw new Error('Credenciales inválidas');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error de autenticación');
+      }
+
+      const data = await response.json();
+      
+      // Solo permitir usuarios admin
+      if (data.user.role !== 'admin') {
+        throw new Error('Acceso denegado. Solo administradores pueden acceder.');
+      }
+
+      setUser(data.user);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem('histor_ar_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   }, []);
 
   const hasPermission = useCallback((permission) => {
     if (!user) return false;
-    const permissions = rolePermissions[user.role];
-    return permissions.includes('*') || permissions.includes(permission);
+    // Los usuarios admin tienen todos los permisos
+    return user.role === 'admin';
   }, [user]);
 
   const contextValue = useMemo(() => ({

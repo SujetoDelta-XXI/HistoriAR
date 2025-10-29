@@ -2,7 +2,6 @@ import { config } from 'dotenv';
 import app from './app.js';
 import { connectDB } from './config/db.js';
 import { verifyGCSConnection, createFolderStructure } from './config/gcs.js';
-import seedUsers from './seeds/seedUsers.js';
 
 config();
 
@@ -24,9 +23,6 @@ const MONGO_URI = process.env.MONGO_URI;
       console.log('📝 To fix: Replace placeholder values in .env file with real GCS credentials');
       console.log('🚀 Server will continue without GCS functionality');
     }
-    
-    // Seed initial data
-    await seedUsers();
     
     // Start server
     app.listen(PORT, () => {

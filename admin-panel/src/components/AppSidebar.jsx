@@ -60,7 +60,7 @@ function AppSidebar({ activeView, onViewChange }) {
       items: [
         {
           id: "dashboard",
-          title: "Dashboard",
+          title: "Panel Principal",
           icon: LayoutDashboard,
           permission: "dashboard:read",
         },
@@ -76,15 +76,9 @@ function AppSidebar({ activeView, onViewChange }) {
           permission: "content:read",
         },
         {
-          id: "museums",
-          title: "Museos",
+          id: "institutions",
+          title: "Instituciones",
           icon: MapPin,
-          permission: "content:read",
-        },
-        {
-          id: "ar-experiences",
-          title: "Experiencias AR",
-          icon: Camera,
           permission: "content:read",
         },
         {
@@ -93,10 +87,16 @@ function AppSidebar({ activeView, onViewChange }) {
           icon: Flag,
           permission: "content:read",
         },
+        {
+          id: "quizzes",
+          title: "Experiencias AR",
+          icon: Camera,
+          permission: "content:read",
+        },
       ],
     },
     {
-      group: "Usuarios y Moderación",
+      group: "Usuarios y Comunicación",
       items: [
         {
           id: "users",
@@ -105,56 +105,10 @@ function AppSidebar({ activeView, onViewChange }) {
           permission: "users:read",
         },
         {
-          id: "reports",
-          title: "Reportes",
-          icon: MessageSquare,
-          permission: "moderation:read",
-        },
-        {
-          id: "reviews",
-          title: "Reseñas",
-          icon: Eye,
-          permission: "moderation:read",
-        },
-        {
           id: "messaging",
           title: "Mensajería",
           icon: Mail,
           permission: "messaging:send",
-        },
-      ],
-    },
-    {
-      group: "Analítica",
-      items: [
-        {
-          id: "analytics",
-          title: "Métricas",
-          icon: BarChart3,
-          permission: "analytics:read",
-        },
-        {
-          id: "export-reports",
-          title: "Reportes",
-          icon: FileText,
-          permission: "reports:export",
-        },
-      ],
-    },
-    {
-      group: "Administración",
-      items: [
-        {
-          id: "audit",
-          title: "Auditoría",
-          icon: Shield,
-          permission: "*",
-        },
-        {
-          id: "settings",
-          title: "Configuración",
-          icon: Settings,
-          permission: "*",
         },
       ],
     },

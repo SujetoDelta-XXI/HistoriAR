@@ -4,7 +4,7 @@
  * Permite listar, filtrar y administrar (mock) usuarios de la app móvil HistoriAR.
  * Incluye envío de mensajes (diálogo mock), bloqueo/desbloqueo y estadísticas rápidas.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -54,110 +54,96 @@ import {
   Users,
   UserCheck,
   UserX,
-  Send
+  Send,
+  Loader2
 } from 'lucide-react';
+import apiService from '../services/api';
 import PropTypes from 'prop-types';
-
-const mockUsers = [
-  {
-    id: '1',
-    name: 'María González',
-    email: 'maria.gonzalez@email.com',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b25c6d6e?w=150',
-    status: 'activo',
-    lastActive: '2024-01-15T14:30:00Z',
-    joinDate: '2023-12-01',
-    device: 'iOS',
-    version: '2.1.0',
-    visits: 15,
-    favoriteDistrict: 'Miraflores',
-    arSessions: 12
-  },
-  {
-    id: '2',
-    name: 'Carlos Ruiz',
-    email: 'carlos.ruiz@email.com',
-    status: 'activo',
-    lastActive: '2024-01-14T09:15:00Z',
-    joinDate: '2023-11-15',
-    device: 'Android',
-    version: '2.0.8',
-    visits: 8,
-    favoriteDistrict: 'San Isidro',
-    arSessions: 6
-  },
-  {
-    id: '3',
-    name: 'Ana Torres',
-    email: 'ana.torres@email.com',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-    status: 'bloqueado',
-    lastActive: '2024-01-10T16:45:00Z',
-    joinDate: '2023-10-20',
-    device: 'Android',
-    version: '2.1.0',
-    visits: 25,
-    favoriteDistrict: 'Barranco',
-    arSessions: 20
-  },
-  {
-    id: '4',
-    name: 'Luis Mendoza',
-    email: 'luis.mendoza@email.com',
-    status: 'activo',
-    lastActive: '2024-01-15T11:20:00Z',
-    joinDate: '2024-01-05',
-    device: 'iOS',
-    version: '2.1.0',
-    visits: 3,
-    favoriteDistrict: 'Lima Centro',
-    arSessions: 2
-  }
-];
 
 // Etiquetas legibles para estado
 const statusLabels = {
-  activo: 'Activo',
-  bloqueado: 'Bloqueado'
+  'Activo': 'Activo',
+  'Suspendido': 'Suspendido',
+  'Eliminado': 'Eliminado'
 };
 
 // Mapeo de colores de badge por estado
 const statusColors = {
-  activo: 'default',
-  bloqueado: 'destructive'
+  'Activo': 'default',
+  'Suspendido': 'destructive',
+  'Eliminado': 'secondary'
+};
+
+// Etiquetas legibles para roles
+const roleLabels = {
+  'user': 'Usuario',
+  'admin': 'Administrador'
 };
 
 function UsersManager() {
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedDevice, setSelectedDevice] = useState('all');
+  const [selectedRole, setSelectedRole] = useState('all');
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
 
-  // Filtro compuesto por nombre/email, estado y dispositivo
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = selectedStatus === 'all' || user.status === selectedStatus;
-    const matchesDevice = selectedDevice === 'all' || user.device === selectedDevice;
-    
-    return matchesSearch && matchesStatus && matchesDevice;
-  });
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  // Alterna estado activo/bloqueado
-  const handleStatusToggle = (id) => {
-    setUsers(prev => 
-      prev.map(user => 
-        user.id === id 
-          ? { ...user, status: user.status === 'activo' ? 'bloqueado' : 'activo' }
-          : user
-      )
-    );
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.getUsers();
+      setUsers(data.items || data || []);
+    } catch (error) {
+      console.error('Error loading users:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Elimina usuario de la lista (mock)
-  const handleDelete = (id) => {
-    setUsers(prev => prev.filter(user => user.id !== id));
+  // Filtro compuesto por nombre/email, estado y rol
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = selectedStatus === 'all' || user.status === selectedStatus;
+    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+    
+    return matchesSearch && matchesStatus && matchesRole;
+  });
+
+  // Alterna estado activo/suspendido
+  const handleStatusToggle = async (id, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'Activo' ? 'Suspendido' : 'Activo';
+      await apiService.updateUser(id, { status: newStatus });
+      setUsers(prev => 
+        prev.map(user => 
+          user._id === id 
+            ? { ...user, status: newStatus }
+            : user
+        )
+      );
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert('Error al actualizar el estado del usuario');
+    }
+  };
+
+  // Elimina usuario
+  const handleDelete = async (id) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este usuario?')) return;
+    
+    try {
+      await apiService.deleteUser(id);
+      setUsers(prev => prev.filter(user => user._id !== id));
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Error al eliminar el usuario');
+    }
   };
 
   // Formatea “última conexión” a horas/días
@@ -222,19 +208,20 @@ function UsersManager() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="activo">Activos</SelectItem>
-                <SelectItem value="bloqueado">Bloqueados</SelectItem>
+                <SelectItem value="Activo">Activos</SelectItem>
+                <SelectItem value="Suspendido">Suspendidos</SelectItem>
+                <SelectItem value="Eliminado">Eliminados</SelectItem>
               </SelectContent>
             </Select>
 
-            <Select value={selectedDevice} onValueChange={setSelectedDevice}>
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Dispositivo" />
+                <SelectValue placeholder="Rol" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="Android">Android</SelectItem>
-                <SelectItem value="iOS">iOS</SelectItem>
+                <SelectItem value="user">Usuarios</SelectItem>
+                <SelectItem value="admin">Administradores</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -266,7 +253,7 @@ function UsersManager() {
               <div>
                 <p className="text-sm font-medium">Usuarios Activos</p>
                 <p className="text-2xl font-bold">
-                  {users.filter(u => u.status === 'activo').length}
+                  {users.filter(u => u.status === 'Activo').length}
                 </p>
               </div>
             </div>
@@ -280,9 +267,9 @@ function UsersManager() {
                 <UserX className="w-4 h-4 text-red-600" />
               </div>
               <div>
-                <p className="text-sm font-medium">Usuarios Bloqueados</p>
+                <p className="text-sm font-medium">Usuarios Suspendidos</p>
                 <p className="text-2xl font-bold">
-                  {users.filter(u => u.status === 'bloqueado').length}
+                  {users.filter(u => u.status === 'Suspendido').length}
                 </p>
               </div>
             </div>
@@ -296,9 +283,9 @@ function UsersManager() {
                 <Activity className="w-4 h-4 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm font-medium">Promedio Visitas</p>
+                <p className="text-sm font-medium">Administradores</p>
                 <p className="text-2xl font-bold">
-                  {Math.round(users.reduce((sum, u) => sum + u.visits, 0) / users.length)}
+                  {users.filter(u => u.role === 'admin').length}
                 </p>
               </div>
             </div>
@@ -320,109 +307,104 @@ function UsersManager() {
               <TableRow>
                 <TableHead>Usuario</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Dispositivo</TableHead>
-                <TableHead>Actividad</TableHead>
-                <TableHead>Estadísticas</TableHead>
-                <TableHead>Última conexión</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Distrito</TableHead>
+                <TableHead>Fecha registro</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src={user.avatar} alt={user.name} />
-                        <AvatarFallback>
-                          {user.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{user.name}</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={statusColors[user.status]}>
-                      {statusLabels[user.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="w-4 h-4 text-muted-foreground" />
-                      <span>{user.device}</span>
-                      <span className="text-xs text-muted-foreground">v{user.version}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{user.favoriteDistrict}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="text-sm">
-                        <span className="font-medium">{user.visits}</span> visitas
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        <span className="font-medium">{user.arSessions}</span> sesiones AR
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="text-sm">{formatLastActive(user.lastActive)}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Desde {new Date(user.joinDate).toLocaleDateString('es-PE')}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Activity className="mr-2 h-4 w-4" />
-                          Ver actividad
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Mail className="mr-2 h-4 w-4" />
-                          Enviar mensaje
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleStatusToggle(user.id)}
-                        >
-                          {user.status === 'activo' ? (
-                            <>
-                              <Ban className="mr-2 h-4 w-4" />
-                              Bloquear usuario
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Desbloquear usuario
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => handleDelete(user.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar usuario
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    <p className="mt-2 text-muted-foreground">Cargando usuarios...</p>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <p className="text-muted-foreground">No se encontraron usuarios</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user._id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src={user.avatarUrl} alt={user.name} />
+                          <AvatarFallback>
+                            {user.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{user.name}</p>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={statusColors[user.status] || 'secondary'}>
+                        {statusLabels[user.status] || user.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                        {roleLabels[user.role] || user.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">{user.district || 'Sin distrito'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {new Date(user.createdAt).toLocaleDateString('es-PE')}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Enviar mensaje
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleStatusToggle(user._id, user.status)}
+                          >
+                            {user.status === 'Activo' ? (
+                              <>
+                                <Ban className="mr-2 h-4 w-4" />
+                                Suspender usuario
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Activar usuario
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => handleDelete(user._id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar usuario
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

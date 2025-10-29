@@ -1,10 +1,10 @@
 /**
  * Gestor de Monumentos (MonumentsManager)
  * 
- * Permite listar, filtrar y administrar (mock) monumentos y sitios históricos.
+ * Permite listar, filtrar y administrar monumentos y sitios históricos.
  * Incluye creación (diálogo), cambio de estado, eliminación y estadísticas rápidas.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -48,111 +48,119 @@ import {
   Eye,
   Trash2,
   MapPin,
-  Calendar
+  Calendar,
+  Loader2
 } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import ModelUpload from './ModelUpload';
+import ImageUpload from './ImageUpload';
+import apiService from '../services/api';
 import PropTypes from 'prop-types';
 
-const mockMonuments = [
-  {
-    id: '1',
-    title: 'Huaca Pucllana',
-    category: 'huaca',
-    district: 'Miraflores',
-    status: 'publicado',
-    visits: 1250,
-    rating: 4.5,
-    lastModified: '2024-01-15',
-    image: 'https://images.unsplash.com/photo-1555078233-8c11a1b6c9b6?w=400',
-    description: 'Sitio arqueológico preincaico de la cultura Lima.',
-    address: 'Calle General Borgoño cuadra 8, Miraflores',
-    schedule: 'Miércoles a Lunes: 9:00 - 17:00',
-    price: 'S/ 15.00'
-  },
-  {
-    id: '2',
-    title: 'Museo Larco',
-    category: 'museo',
-    district: 'Pueblo Libre',
-    status: 'publicado',
-    visits: 650,
-    rating: 4.8,
-    lastModified: '2024-01-12',
-    image: 'https://images.unsplash.com/photo-1580619305218-8423a7ef79b4?w=400',
-    description: 'Museo privado de arte precolombino peruano.',
-    address: 'Av. Simón Bolívar 1515, Pueblo Libre',
-    schedule: 'Todos los días: 9:00 - 22:00',
-    price: 'S/ 30.00'
-  },
-  {
-    id: '3',
-    title: 'Casa de Aliaga',
-    category: 'sitio_historico',
-    district: 'Lima Centro',
-    status: 'borrador',
-    visits: 420,
-    rating: 4.2,
-    lastModified: '2024-01-10',
-    image: 'https://images.unsplash.com/photo-1518331647614-4ca666c4e2c2?w=400',
-    description: 'Casa colonial del siglo XVI habitada por la misma familia.',
-    address: 'Jr. de la Unión 224, Lima',
-    schedule: 'Lunes a Viernes: 10:00 - 17:00',
-    price: 'S/ 35.00'
-  }
-];
-
-// Etiquetas legibles para las categorías
-const categoryLabels = {
-  huaca: 'Huaca',
-  museo: 'Museo',
-  sitio_historico: 'Sitio Histórico'
-};
+// Esta función se actualizará dinámicamente con las categorías de la base de datos
 
 // Etiquetas legibles para los estados
 const statusLabels = {
-  borrador: 'Borrador',
-  publicado: 'Publicado',
-  oculto: 'Oculto'
+  'Disponible': 'Disponible',
+  'Oculto': 'Oculto',
+  'Borrado': 'Borrado'
 };
 
 // Mapeo de color de badge por estado
 const statusColors = {
-  borrador: 'secondary',
-  publicado: 'default',
-  oculto: 'destructive'
+  'Disponible': 'default',
+  'Oculto': 'secondary',
+  'Borrado': 'destructive'
 };
 
 function MonumentsManager() {
-  const [monuments, setMonuments] = useState(mockMonuments);
+  const [monuments, setMonuments] = useState([]);
+  const [institutions, setInstitutions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingMonument, setEditingMonument] = useState(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [monumentsData, institutionsData, categoriesData] = await Promise.all([
+        apiService.getMonuments(),
+        apiService.getInstitutions(),
+        apiService.getCategories()
+      ]);
+      
+      setMonuments(monumentsData.items || monumentsData || []);
+      setInstitutions(institutionsData.items || institutionsData || []);
+      setCategories(categoriesData.items || categoriesData || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filtro compuesto por término de búsqueda, categoría y estado
   const filteredMonuments = monuments.filter(monument => {
-    const matchesSearch = monument.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         monument.district.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || monument.category === selectedCategory;
+    const matchesSearch = monument.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         monument.location?.district?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || monument.categoryId === selectedCategory;
     const matchesStatus = selectedStatus === 'all' || monument.status === selectedStatus;
     
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
-  // Cambiar estado del monumento y actualizar última modificación
-  const handleStatusChange = (id, newStatus) => {
-    setMonuments(prev => 
-      prev.map(monument => 
-        monument.id === id 
-          ? { ...monument, status: newStatus, lastModified: new Date().toISOString().split('T')[0] }
-          : monument
-      )
-    );
+  // Función para obtener el nombre de la categoría
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(c => c._id === categoryId);
+    return category?.name || 'Sin categoría';
   };
 
-  // Eliminar monumento de la lista
-  const handleDelete = (id) => {
-    setMonuments(prev => prev.filter(monument => monument.id !== id));
+  // Cambiar estado del monumento
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await apiService.updateMonument(id, { status: newStatus });
+      setMonuments(prev => 
+        prev.map(monument => 
+          monument._id === id 
+            ? { ...monument, status: newStatus }
+            : monument
+        )
+      );
+    } catch (error) {
+      console.error('Error updating monument status:', error);
+    }
+  };
+
+  // Eliminar monumento
+  const handleDelete = async (id) => {
+    try {
+      await apiService.deleteMonument(id);
+      setMonuments(prev => prev.filter(monument => monument._id !== id));
+    } catch (error) {
+      console.error('Error deleting monument:', error);
+    }
+  };
+
+  // Abrir diálogo de edición
+  const handleEdit = (monument) => {
+    setEditingMonument(monument);
+    setIsEditDialogOpen(true);
+  };
+
+  // Cerrar diálogo de edición
+  const handleCloseEdit = () => {
+    setEditingMonument(null);
+    setIsEditDialogOpen(false);
   };
 
   return (
@@ -173,14 +181,38 @@ function MonumentsManager() {
               Nuevo Monumento
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Monumento</DialogTitle>
               <DialogDescription>
                 Añade un nuevo monumento o sitio histórico al catálogo
               </DialogDescription>
             </DialogHeader>
-            <MonumentForm onClose={() => setIsCreateDialogOpen(false)} />
+            <MonumentForm 
+              institutions={institutions}
+              categories={categories}
+              onClose={() => setIsCreateDialogOpen(false)}
+              onSave={loadData}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de edición de monumento */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Monumento</DialogTitle>
+              <DialogDescription>
+                Modifica la información del monumento seleccionado
+              </DialogDescription>
+            </DialogHeader>
+            <MonumentForm 
+              monument={editingMonument}
+              institutions={institutions}
+              categories={categories}
+              onClose={handleCloseEdit}
+              onSave={loadData}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -205,9 +237,11 @@ function MonumentsManager() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las categorías</SelectItem>
-                <SelectItem value="huaca">Huacas</SelectItem>
-                <SelectItem value="museo">Museos</SelectItem>
-                <SelectItem value="sitio_historico">Sitios Históricos</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category._id} value={category._id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -217,9 +251,9 @@ function MonumentsManager() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="publicado">Publicado</SelectItem>
-                <SelectItem value="borrador">Borrador</SelectItem>
-                <SelectItem value="oculto">Oculto</SelectItem>
+                <SelectItem value="Disponible">Disponible</SelectItem>
+                <SelectItem value="Oculto">Oculto</SelectItem>
+                <SelectItem value="Borrado">Borrado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -249,9 +283,9 @@ function MonumentsManager() {
                 <Eye className="w-4 h-4 text-green-600" />
               </div>
               <div>
-                <p className="text-sm font-medium">Publicados</p>
+                <p className="text-sm font-medium">Disponibles</p>
                 <p className="text-2xl font-bold">
-                  {monuments.filter(m => m.status === 'publicado').length}
+                  {monuments.filter(m => m.status === 'Disponible').length}
                 </p>
               </div>
             </div>
@@ -265,9 +299,9 @@ function MonumentsManager() {
                 <Edit className="w-4 h-4 text-orange-600" />
               </div>
               <div>
-                <p className="text-sm font-medium">Borradores</p>
+                <p className="text-sm font-medium">Ocultos</p>
                 <p className="text-2xl font-bold">
-                  {monuments.filter(m => m.status === 'borrador').length}
+                  {monuments.filter(m => m.status === 'Oculto').length}
                 </p>
               </div>
             </div>
@@ -281,9 +315,9 @@ function MonumentsManager() {
                 <Calendar className="w-4 h-4 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm font-medium">Visitas Total</p>
+                <p className="text-sm font-medium">Con Modelo 3D</p>
                 <p className="text-2xl font-bold">
-                  {monuments.reduce((sum, m) => sum + m.visits, 0).toLocaleString()}
+                  {monuments.filter(m => m.model3DUrl).length}
                 </p>
               </div>
             </div>
@@ -307,88 +341,113 @@ function MonumentsManager() {
                 <TableHead>Categoría</TableHead>
                 <TableHead>Distrito</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Visitas</TableHead>
+                <TableHead>Modelo 3D</TableHead>
+                <TableHead>Período</TableHead>
                 <TableHead>Última modificación</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMonuments.map((monument) => (
-                <TableRow key={monument.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <ImageWithFallback
-                        src={monument.image}
-                        alt={monument.title}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                      <div>
-                        <p className="font-medium">{monument.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          ⭐ {monument.rating} • {monument.price}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {categoryLabels[monument.category]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{monument.district}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusColors[monument.status]}>
-                      {statusLabels[monument.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{monument.visits.toLocaleString()}</TableCell>
-                  <TableCell>
-                    {new Date(monument.lastModified).toLocaleDateString('es-PE')}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver detalles
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        {monument.status === 'borrador' && (
-                          <DropdownMenuItem 
-                            onClick={() => handleStatusChange(monument.id, 'publicado')}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Publicar
-                          </DropdownMenuItem>
-                        )}
-                        {monument.status === 'publicado' && (
-                          <DropdownMenuItem 
-                            onClick={() => handleStatusChange(monument.id, 'oculto')}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ocultar
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => handleDelete(monument.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    <p className="mt-2 text-muted-foreground">Cargando monumentos...</p>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredMonuments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <p className="text-muted-foreground">No se encontraron monumentos</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredMonuments.map((monument) => (
+                  <TableRow key={monument._id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <ImageWithFallback
+                          src={monument.imageUrl || '/placeholder-monument.jpg'}
+                          alt={monument.name}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                        <div>
+                          <p className="font-medium">{monument.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {monument.culture || 'Sin cultura definida'}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {getCategoryName(monument.categoryId)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{monument.location?.district || 'Sin distrito'}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusColors[monument.status] || 'secondary'}>
+                        {statusLabels[monument.status] || monument.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {monument.model3DUrl ? (
+                        <Badge variant="default" className="bg-green-100 text-green-800">
+                          Disponible
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          Sin modelo
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {monument.period?.name || 'Sin período'}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(monument.updatedAt || monument.createdAt).toLocaleDateString('es-PE')}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(monument)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          {monument.status === 'Oculto' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleStatusChange(monument._id, 'Disponible')}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Hacer disponible
+                            </DropdownMenuItem>
+                          )}
+                          {monument.status === 'Disponible' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleStatusChange(monument._id, 'Oculto')}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ocultar
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => handleDelete(monument._id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -397,25 +456,133 @@ function MonumentsManager() {
   );
 }
 
-function MonumentForm({ onClose }) {
-  // Formulario simple de creación (mock) de monumentos
+function MonumentForm({ onClose, monument = null, institutions = [], categories = [], onSave }) {
+  const [formData, setFormData] = useState({
+    name: monument?.name || '',
+    categoryId: monument?.categoryId || '',
+    description: monument?.description || '',
+    culture: monument?.culture || '',
+    institutionId: monument?.institutionId || '',
+    location: {
+      lat: monument?.location?.lat || '',
+      lng: monument?.location?.lng || '',
+      address: monument?.location?.address || '',
+      district: monument?.location?.district || ''
+    },
+    period: {
+      name: monument?.period?.name || '',
+      startYear: monument?.period?.startYear || '',
+      endYear: monument?.period?.endYear || ''
+    },
+    model3DUrl: monument?.model3DUrl || null,
+    imageUrl: monument?.imageUrl || null
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleModelUpload = (modelUrl, fileName) => {
+    setFormData(prev => ({ ...prev, model3DUrl: modelUrl }));
+  };
+
+  const handleModelUploadError = (error) => {
+    console.error('Error uploading model:', error);
+    // Handle error (could show toast notification)
+  };
+
+  const handleImageUpload = (imageUrl, fileName) => {
+    setFormData(prev => ({ ...prev, imageUrl: imageUrl }));
+  };
+
+  const handleImageUploadError = (error) => {
+    console.error('Error uploading image:', error);
+    // Handle error (could show toast notification)
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      if (monument) {
+        // Actualizar monumento existente
+        await apiService.updateMonument(monument._id, formData);
+      } else {
+        // Crear nuevo monumento
+        await apiService.createMonument(formData);
+      }
+      
+      onSave(); // Recargar la lista
+      onClose();
+    } catch (error) {
+      console.error('Error saving monument:', error);
+      alert('Error al guardar el monumento: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isEditing = Boolean(monument);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="title">Título</Label>
-          <Input id="title" placeholder="Nombre del monumento" />
+          <Label htmlFor="name">Nombre</Label>
+          <Input 
+            id="name" 
+            placeholder="Nombre del monumento"
+            value={formData.name}
+            onChange={(e) => handleInputChange('name', e.target.value)}
+            required
+          />
         </div>
         <div>
-          <Label htmlFor="category">Categoría</Label>
-          <Select>
+          <Label htmlFor="categoryId">Categoría</Label>
+          <Select 
+            value={formData.categoryId} 
+            onValueChange={(value) => handleInputChange('categoryId', value)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Seleccionar categoría" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="huaca">Huaca</SelectItem>
-              <SelectItem value="museo">Museo</SelectItem>
-              <SelectItem value="sitio_historico">Sitio Histórico</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category._id} value={category._id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="culture">Cultura</Label>
+          <Input 
+            id="culture" 
+            placeholder="Ej: Inca, Moche, Colonial"
+            value={formData.culture}
+            onChange={(e) => handleInputChange('culture', e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="institutionId">Institución</Label>
+          <Select 
+            value={formData.institutionId} 
+            onValueChange={(value) => handleInputChange('institutionId', value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar institución" />
+            </SelectTrigger>
+            <SelectContent>
+              {institutions.map((institution) => (
+                <SelectItem key={institution._id} value={institution._id}>
+                  {institution.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -424,22 +591,79 @@ function MonumentForm({ onClose }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="district">Distrito</Label>
-          <Input id="district" placeholder="Distrito" />
+          <Input 
+            id="district" 
+            placeholder="Distrito"
+            value={formData.location.district}
+            onChange={(e) => handleInputChange('location', { ...formData.location, district: e.target.value })}
+          />
         </div>
         <div>
-          <Label htmlFor="price">Precio</Label>
-          <Input id="price" placeholder="S/ 0.00" />
+          <Label htmlFor="address">Dirección</Label>
+          <Input 
+            id="address" 
+            placeholder="Dirección completa"
+            value={formData.location.address}
+            onChange={(e) => handleInputChange('location', { ...formData.location, address: e.target.value })}
+          />
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="address">Dirección</Label>
-        <Input id="address" placeholder="Dirección completa" />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="lat">Latitud</Label>
+          <Input 
+            id="lat" 
+            type="number"
+            step="any"
+            placeholder="-12.0464"
+            value={formData.location.lat}
+            onChange={(e) => handleInputChange('location', { ...formData.location, lat: parseFloat(e.target.value) || '' })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="lng">Longitud</Label>
+          <Input 
+            id="lng" 
+            type="number"
+            step="any"
+            placeholder="-77.0428"
+            value={formData.location.lng}
+            onChange={(e) => handleInputChange('location', { ...formData.location, lng: parseFloat(e.target.value) || '' })}
+          />
+        </div>
       </div>
 
-      <div>
-        <Label htmlFor="schedule">Horarios</Label>
-        <Input id="schedule" placeholder="Lunes a Viernes: 9:00 - 17:00" />
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="periodName">Período</Label>
+          <Input 
+            id="periodName" 
+            placeholder="Ej: Horizonte Tardío"
+            value={formData.period.name}
+            onChange={(e) => handleInputChange('period', { ...formData.period, name: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="startYear">Año inicio</Label>
+          <Input 
+            id="startYear" 
+            type="number"
+            placeholder="1200"
+            value={formData.period.startYear}
+            onChange={(e) => handleInputChange('period', { ...formData.period, startYear: parseInt(e.target.value) || '' })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="endYear">Año fin</Label>
+          <Input 
+            id="endYear" 
+            type="number"
+            placeholder="1532"
+            value={formData.period.endYear}
+            onChange={(e) => handleInputChange('period', { ...formData.period, endYear: parseInt(e.target.value) || '' })}
+          />
+        </div>
       </div>
 
       <div>
@@ -448,15 +672,55 @@ function MonumentForm({ onClose }) {
           id="description" 
           placeholder="Descripción del monumento o sitio histórico"
           rows={3}
+          value={formData.description}
+          onChange={(e) => handleInputChange('description', e.target.value)}
         />
       </div>
 
+      {/* Image Upload Section */}
+      <div>
+        <Label>Imagen del monumento</Label>
+        <div className="mt-2">
+          <ImageUpload
+            currentImageUrl={formData.imageUrl}
+            onUploadComplete={handleImageUpload}
+            onUploadError={handleImageUploadError}
+            disabled={isSubmitting}
+          />
+        </div>
+      </div>
+
+      {/* 3D Model Upload Section */}
+      <div>
+        <Label>Modelo 3D</Label>
+        <div className="mt-2">
+          <ModelUpload
+            currentModelUrl={formData.model3DUrl}
+            onUploadComplete={handleModelUpload}
+            onUploadError={handleModelUploadError}
+            disabled={isSubmitting}
+          />
+        </div>
+        {formData.model3DUrl && (
+          <p className="text-sm text-muted-foreground mt-2">
+            Modelo actual: {formData.model3DUrl.split('/').pop()}
+          </p>
+        )}
+      </div>
+
       <div className="flex justify-end gap-2 pt-4">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button onClick={onClose}>
-          Crear Monumento
+        <Button onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {isEditing ? 'Actualizando...' : 'Creando...'}
+            </>
+          ) : (
+            isEditing ? 'Actualizar Monumento' : 'Crear Monumento'
+          )}
         </Button>
       </div>
     </div>
@@ -465,6 +729,10 @@ function MonumentForm({ onClose }) {
 
 MonumentForm.propTypes = {
   onClose: PropTypes.func.isRequired,
+  monument: PropTypes.object,
+  institutions: PropTypes.array.isRequired,
+  categories: PropTypes.array.isRequired,
+  onSave: PropTypes.func.isRequired,
 };
 
 export default MonumentsManager;

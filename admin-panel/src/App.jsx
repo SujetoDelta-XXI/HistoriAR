@@ -6,6 +6,8 @@ import LoginForm from './components/LoginForm';
 import AppSidebar from './components/AppSidebar';
 import Dashboard from './components/Dashboard';
 import MonumentsManager from './components/MonumentsManager';
+import InstitutionsManager from './components/InstitutionsManager';
+import CategoriesManager from './components/CategoriesManager';
 import UsersManager from './components/UsersManager';
 import AnalyticsView from './components/AnalyticsView';
 import { SidebarProvider, SidebarInset } from './components/ui/sidebar';
@@ -35,70 +37,23 @@ function AppContent() {
         return <Dashboard />;
       case 'monuments':
         return <MonumentsManager />;
-      case 'museums':
-        return (
-          <div className="p-6">
-            <h1>Gestión de Museos</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
-      case 'ar-experiences':
-        return (
-          <div className="p-6">
-            <h1>Experiencias AR</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
+      case 'institutions':
+        return <InstitutionsManager />;
       case 'categories':
+        return <CategoriesManager />;
+      case 'quizzes':
         return (
           <div className="p-6">
-            <h1>Categorías</h1>
+            <h1>Experiencias AR (Quizzes)</h1>
             <p>Funcionalidad en desarrollo...</p>
           </div>
         );
       case 'users':
         return <UsersManager />;
-      case 'reports':
-        return (
-          <div className="p-6">
-            <h1>Reportes de Usuarios</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
-      case 'reviews':
-        return (
-          <div className="p-6">
-            <h1>Gestión de Reseñas</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
       case 'messaging':
         return (
           <div className="p-6">
             <h1>Sistema de Mensajería</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
-      case 'analytics':
-        return <AnalyticsView />;
-      case 'export-reports':
-        return (
-          <div className="p-6">
-            <h1>Exportar Reportes</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
-      case 'audit':
-        return (
-          <div className="p-6">
-            <h1>Auditoría del Sistema</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
-      case 'settings':
-        return (
-          <div className="p-6">
-            <h1>Configuración del Sistema</h1>
             <p>Funcionalidad en desarrollo...</p>
           </div>
         );

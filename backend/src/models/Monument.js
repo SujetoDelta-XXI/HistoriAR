@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const MonumentSchema = new mongoose.Schema({
   name:        { type: String, required: true, index: true },
   description: { type: String, index: 'text' },
-  category:    { type: String, enum: ['Arqueológico', 'Colonial', 'Republicano', 'Contemporáneo'], default: 'Arqueológico', index: true },
+  categoryId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true, index: true },
   location: {
     lat:      { type: Number },
     lng:      { type: Number },
@@ -29,7 +29,7 @@ const MonumentSchema = new mongoose.Schema({
 MonumentSchema.index({ name: 'text', description: 'text' });
 
 // Add compound indexes for query optimization (Requirements 4.5, 5.4)
-MonumentSchema.index({ status: 1, category: 1 });
+MonumentSchema.index({ status: 1, categoryId: 1 });
 MonumentSchema.index({ status: 1, 'location.district': 1 });
 MonumentSchema.index({ status: 1, institutionId: 1 });
 MonumentSchema.index({ status: 1, name: 1 }); // For default sorting

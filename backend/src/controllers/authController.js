@@ -17,3 +17,17 @@ export async function login(req, res) {
     res.status(400).json({ message: err.message });
   }
 }
+
+export async function validateToken(req, res) {
+  try {
+    // El middleware verifyToken ya validó el token y agregó req.user
+    // Solo devolvemos los datos del usuario si el token es válido
+    res.json({
+      id: req.user.id,
+      email: req.user.email,
+      role: req.user.role
+    });
+  } catch (err) {
+    res.status(401).json({ message: 'Token inválido' });
+  }
+}

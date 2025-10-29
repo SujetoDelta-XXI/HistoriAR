@@ -23,7 +23,7 @@ router.post('/image', verifyToken, requireRole('admin'), uploadImage.single('ima
     );
 
     res.json({
-      url: result.url,
+      imageUrl: result.url,
       filename: result.filename,
       message: 'Image uploaded successfully'
     });
@@ -36,7 +36,7 @@ router.post('/image', verifyToken, requireRole('admin'), uploadImage.single('ima
 });
 
 // Upload 3D model to GCS
-router.post('/model', verifyToken, requireRole('admin'), uploadModel.single('model3d'), async (req, res) => {
+router.post('/model', verifyToken, requireRole('admin'), uploadModel.single('model'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No 3D model file provided' });
@@ -53,7 +53,7 @@ router.post('/model', verifyToken, requireRole('admin'), uploadModel.single('mod
     );
 
     res.json({
-      url: result.url,
+      modelUrl: result.url,
       filename: result.filename,
       message: '3D model uploaded successfully'
     });
