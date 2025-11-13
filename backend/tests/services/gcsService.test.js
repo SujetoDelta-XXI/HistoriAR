@@ -135,8 +135,7 @@ describe('GCSService', () => {
 
       expect(mockBucket.file).toHaveBeenCalledWith(expect.stringMatching(/^models\/.*\.glb$/));
       expect(mockFile.save).toHaveBeenCalledWith(fileBuffer, {
-        metadata: { contentType: mimeType },
-        public: true
+        metadata: { contentType: mimeType }
       });
       expect(result.url).toMatch(/^https:\/\/storage\.googleapis\.com\/histori_ar\/models\/.*\.glb$/);
       expect(result.filename).toMatch(/^models\/.*\.glb$/);
@@ -166,8 +165,7 @@ describe('GCSService', () => {
 
       expect(mockBucket.file).toHaveBeenCalledWith(expect.stringMatching(/^images\/.*\.jpg$/));
       expect(mockFile.save).toHaveBeenCalledWith(fileBuffer, {
-        metadata: { contentType: mimeType },
-        public: true
+        metadata: { contentType: mimeType }
       });
       expect(result.url).toMatch(/^https:\/\/storage\.googleapis\.com\/histori_ar\/images\/.*\.jpg$/);
       expect(result.filename).toMatch(/^images\/.*\.jpg$/);

@@ -64,23 +64,28 @@ export const createFolderStructure = async () => {
   }
 
   try {
-    // Create models/ folder by uploading a placeholder file
-    const modelsPlaceholder = bucket.file('models/.gitkeep');
-    await modelsPlaceholder.save('', {
-      metadata: {
-        contentType: 'text/plain',
-      },
-    });
+    // Create folder structure by uploading placeholder files
+    const folders = [
+      'models/.gitkeep',
+      'models/monuments/.gitkeep',
+      'images/.gitkeep',
+      'images/monuments/.gitkeep'
+      // Note: images/monuments/{monumentId}/fichas/ se crea automáticamente al subir archivos
+    ];
 
-    // Create images/ folder by uploading a placeholder file
-    const imagesPlaceholder = bucket.file('images/.gitkeep');
-    await imagesPlaceholder.save('', {
-      metadata: {
-        contentType: 'text/plain',
-      },
-    });
+    await Promise.all(
+      folders.map(async (folderPath) => {
+        const file = bucket.file(folderPath);
+        await file.save('', {
+          metadata: {
+            contentType: 'text/plain',
+          },
+        });
+      })
+    );
 
-    console.log('✅ GCS folder structure created: models/, images/');
+    console.log('✅ GCS folder structure created: models/, models/monuments/, images/, images/monuments/');
+    console.log('   Note: Subfolder fichas/ will be created automatically when uploading historical data images');
     return true;
   } catch (error) {
     console.error('❌ Failed to create folder structure:', error.message);

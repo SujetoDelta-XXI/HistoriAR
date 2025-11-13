@@ -18,6 +18,7 @@ const MonumentSchema = new mongoose.Schema({
   culture:      { type: String },
   imageUrl:     { type: String }, // GCS URL for monument images
   model3DUrl:   { type: String }, // GCS URL for 3D models
+  model3DTilesUrl: { type: String }, // GCS URL for 3D Tiles tileset.json (opcional)
   gcsImageFileName: { type: String }, // GCS filename for image deletion
   gcsModelFileName: { type: String }, // GCS filename for model deletion (renamed from gcsFileName)
   institutionId:{ type: mongoose.Schema.Types.ObjectId, ref: 'Institution', index: true },

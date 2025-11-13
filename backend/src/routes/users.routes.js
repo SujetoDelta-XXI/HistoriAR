@@ -7,6 +7,13 @@ import {
   updateUserController,
   deleteUserController
 } from '../controllers/usersController.js';
+import { 
+  getUserPreferencesController, 
+  updateUserPreferencesController 
+} from '../controllers/userPreferencesController.js';
+import { 
+  getAllUserAttemptsController 
+} from '../controllers/quizzesController.js';
 import { verifyToken, requireRole } from '../middlewares/auth.js';
 
 const router = Router();
@@ -17,6 +24,19 @@ const router = Router();
  * Endpoint: GET /api/users/me
  */
 router.get('/me', verifyToken, getMyProfile);
+
+/**
+ * 👤 Rutas de preferencias de usuario
+ * Disponibles para el propio usuario o admin
+ */
+router.get('/:id/preferences', verifyToken, getUserPreferencesController);
+router.put('/:id/preferences', verifyToken, updateUserPreferencesController);
+
+/**
+ * 👤 Rutas de quiz attempts de usuario
+ * Disponibles para el propio usuario o admin
+ */
+router.get('/:userId/quiz-attempts', verifyToken, getAllUserAttemptsController);
 
 /**
  * 🔒 Rutas protegidas solo para administradores

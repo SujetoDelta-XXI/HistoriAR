@@ -32,6 +32,7 @@ import {
   ChevronUp,
   FileText,
   Flag,
+  HelpCircle,
   LayoutDashboard,
   MapPin,
   MessageSquare,
@@ -91,6 +92,24 @@ function AppSidebar({ activeView, onViewChange }) {
           id: "quizzes",
           title: "Experiencias AR",
           icon: Camera,
+          permission: "content:read",
+        },
+        {
+          id: "tours",
+          title: "Recorridos",
+          icon: MapPin,
+          permission: "content:read",
+        },
+        {
+          id: "historical-data",
+          title: "Fichas Históricas",
+          icon: FileText,
+          permission: "content:read",
+        },
+        {
+          id: "quiz-manager",
+          title: "Quizzes",
+          icon: HelpCircle,
           permission: "content:read",
         },
       ],
@@ -166,13 +185,13 @@ function AppSidebar({ activeView, onViewChange }) {
                 <SidebarMenuButton>
                   <Avatar className="w-8 h-8">
                     <AvatarFallback>
-                      {user?.name.charAt(0).toUpperCase()}
+                      {user?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-medium">{user?.name}</span>
+                    <span className="text-sm font-medium">{user?.name || 'Usuario'}</span>
                     <span className="text-xs text-muted-foreground capitalize">
-                      {user?.role.replace('_', ' ')}
+                      {user?.role?.replace('_', ' ') || 'usuario'}
                     </span>
                   </div>
                   <ChevronUp className="ml-auto" />

@@ -1,5 +1,17 @@
 import { Router } from 'express';
-import { listMonument, getMonument, createMonumentController, updateMonumentController, deleteMonumentController, searchMonumentsController, getFilterOptionsController } from '../controllers/monumentsController.js';
+import { 
+  listMonument, 
+  getMonument, 
+  createMonumentController, 
+  updateMonumentController, 
+  deleteMonumentController, 
+  searchMonumentsController, 
+  getFilterOptionsController,
+  getModelVersionsController,
+  activateModelVersionController,
+  deleteModelVersionController,
+  uploadModelVersionController
+} from '../controllers/monumentsController.js';
 import { verifyToken, requireRole } from '../middlewares/auth.js';
 import multer from 'multer';
 
@@ -38,6 +50,12 @@ router.put('/:id',
 
 router.delete('/:id', verifyToken, requireRole('admin'), deleteMonumentController);
 
+// Model versioning endpoints
+router.get('/:id/model-versions', verifyToken, requireRole('admin'), getModelVersionsController);
+router.post('/:id/upload-model', verifyToken, requireRole('admin'), upload.single('model'), uploadModelVersionController);
+router.post('/:id/model-versions/:versionId/activate', verifyToken, requireRole('admin'), activateModelVersionController);
+router.delete('/:id/model-versions/:versionId', verifyToken, requireRole('admin'), deleteModelVersionController);
+
 // Upload endpoints specifically for monuments
 router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('image'), async (req, res) => {
   try {
@@ -45,17 +63,31 @@ router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('i
       return res.status(400).json({ error: 'No image file provided' });
     }
 
+    const { monumentId } = req.body;
     const gcsService = (await import('../services/gcsService.js')).default;
     
     // Validate image file
     gcsService.validateImageFile(req.file);
 
-    // Upload to GCS
-    const result = await gcsService.uploadImage(
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype
-    );
+    let result;
+    
+    if (monumentId) {
+      // Upload to structured path: images/monuments/{monumentId}/
+      result = await gcsService.uploadImageWithVersioning(
+        req.file.buffer,
+        monumentId,
+        req.file.originalname,
+        req.file.mimetype,
+        false // isHistoricalData = false (imagen principal del monumento)
+      );
+    } else {
+      // Fallback to old method for backward compatibility (creating new monuments)
+      result = await gcsService.uploadImage(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
+    }
 
     res.json({
       imageUrl: result.url,

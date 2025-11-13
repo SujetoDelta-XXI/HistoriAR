@@ -4,7 +4,8 @@ import { getAllInstitutions, getInstitutionById, createInstitution, updateInstit
 export async function listInstitution(req, res) {
   try {
     const { skip, limit, page } = buildPagination(req.query);
-    const { items, total } = await getAllInstitutions({ skip, limit });
+    const availableOnly = req.query.availableOnly === 'true';
+    const { items, total } = await getAllInstitutions({ skip, limit, availableOnly });
     res.json({ page, total, items });
   } catch (err) { res.status(500).json({ message: err.message }); }
 }

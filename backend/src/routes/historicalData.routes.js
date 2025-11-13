@@ -1,25 +1,73 @@
-import { Router } from 'express';
-import { listHistoricalData, getHistoricalData, createHistoricalDataController, updateHistoricalDataController, deleteHistoricalDataController } from '../controllers/historicalDataController.js';
+import express from 'express';
+import multer from 'multer';
+import {
+  getHistoricalDataByMonument,
+  getHistoricalDataById,
+  createHistoricalData,
+  updateHistoricalData,
+  deleteHistoricalData,
+  reorderHistoricalData
+} from '../controllers/historicalDataController.js';
 import { verifyToken, requireRole } from '../middlewares/auth.js';
-import { uploadImage } from '../utils/uploader.js';
 
-const router = Router();
+const router = express.Router();
 
-router.get('/', listHistoricalData);
-router.get('/:id', getHistoricalData);
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit for images
+  },
+});
 
-router.post('/',
-  verifyToken, requireRole('admin'),
-  uploadImage.array('oldImages', 10),
-  createHistoricalDataController
+// Get all historical data for a monument
+router.get(
+  '/monuments/:monumentId/historical-data',
+  verifyToken,
+  requireRole('admin'),
+  getHistoricalDataByMonument
 );
 
-router.put('/:id',
-  verifyToken, requireRole('admin'),
-  uploadImage.array('oldImages', 10),
-  updateHistoricalDataController
+// Get a single historical data entry
+router.get(
+  '/historical-data/:id',
+  verifyToken,
+  requireRole('admin'),
+  getHistoricalDataById
 );
 
-router.delete('/:id', verifyToken, requireRole('admin'), deleteHistoricalDataController);
+// Create new historical data entry
+router.post(
+  '/monuments/:monumentId/historical-data',
+  verifyToken,
+  requireRole('admin'),
+  upload.single('image'),
+  createHistoricalData
+);
+
+// Update historical data entry
+router.put(
+  '/historical-data/:id',
+  verifyToken,
+  requireRole('admin'),
+  upload.single('image'),
+  updateHistoricalData
+);
+
+// Delete historical data entry
+router.delete(
+  '/historical-data/:id',
+  verifyToken,
+  requireRole('admin'),
+  deleteHistoricalData
+);
+
+// Reorder historical data entries
+router.put(
+  '/monuments/:monumentId/historical-data/reorder',
+  verifyToken,
+  requireRole('admin'),
+  reorderHistoricalData
+);
 
 export default router;
