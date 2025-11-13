@@ -95,14 +95,17 @@ function ARExperiencesManager() {
       const response = await apiService.getMonuments();
       const monumentsList = response.items || response || [];
       
-      setMonuments(monumentsList);
+      // Filter only monuments with images
+      const monumentsWithImages = monumentsList.filter(m => m.imageUrl);
       
-      // Separate monuments with and without models
-      const withModels = monumentsList.filter(m => m.model3DUrl);
-      const withoutModels = monumentsList.filter(m => !m.model3DUrl);
+      setMonuments(monumentsWithImages);
       
-      setMonumentsWithModels(withModels);
+      // Separate monuments with and without models (prioritizing those without models)
+      const withoutModels = monumentsWithImages.filter(m => !m.model3DUrl);
+      const withModels = monumentsWithImages.filter(m => m.model3DUrl);
+      
       setMonumentsWithoutModels(withoutModels);
+      setMonumentsWithModels(withModels);
     } catch (error) {
       console.error('Error loading monuments:', error);
       showNotification('error', 'Error al cargar monumentos');
@@ -340,6 +343,34 @@ function ARExperiencesManager() {
           </div>
         ) : (
           <>
+            {/* Monuments without 3D Models - Priority Display */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">
+                  Monumentos sin Modelos 3D ({filteredWithoutModels.length})
+                </h2>
+              </div>
+              
+              {filteredWithoutModels.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    {searchTerm ? 'No se encontraron monumentos sin modelos' : 'Todos los monumentos tienen modelos 3D'}
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {filteredWithoutModels.map((monument) => (
+                    <MonumentCard
+                      key={monument._id}
+                      monument={monument}
+                      hasModel={false}
+                      onClick={() => handleMonumentClick(monument)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Monuments with 3D Models */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -355,40 +386,12 @@ function ARExperiencesManager() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {filteredWithModels.map((monument) => (
                     <MonumentCard
                       key={monument._id}
                       monument={monument}
                       hasModel={true}
-                      onClick={() => handleMonumentClick(monument)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Monuments without 3D Models */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">
-                  Monumentos sin Modelos 3D ({filteredWithoutModels.length})
-                </h2>
-              </div>
-              
-              {filteredWithoutModels.length === 0 ? (
-                <Card>
-                  <CardContent className="p-8 text-center text-muted-foreground">
-                    {searchTerm ? 'No se encontraron monumentos sin modelos' : 'Todos los monumentos tienen modelos 3D'}
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredWithoutModels.map((monument) => (
-                    <MonumentCard
-                      key={monument._id}
-                      monument={monument}
-                      hasModel={false}
                       onClick={() => handleMonumentClick(monument)}
                     />
                   ))}

@@ -338,38 +338,39 @@ function ToursManager() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           {institutions.map(institution => (
             <Card 
               key={institution._id} 
-              className="hover:shadow-lg transition-shadow cursor-pointer"
+              className="cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => handleSelectInstitution(institution)}
             >
               <CardContent className="p-4">
-                <div className="flex items-start gap-3">
+                <div className="space-y-3">
                   {institution.imageUrl ? (
                     <ImageWithFallback
                       src={institution.imageUrl}
                       alt={institution.name}
-                      className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                      className="w-full h-40 rounded-lg object-cover"
                     />
                   ) : (
-                    <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Building className="w-8 h-8 text-muted-foreground" />
+                    <div className="w-full h-40 bg-muted rounded-lg flex items-center justify-center">
+                      <Building className="w-16 h-16 text-muted-foreground" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold mb-1 truncate">{institution.name}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {institution.description || 'Sin descripción'}
-                    </p>
+                  <div>
+                    <h3 className="font-semibold line-clamp-1">{institution.name}</h3>
                     {institution.location?.district && (
-                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
+                      <p className="text-sm text-muted-foreground line-clamp-1">
                         {institution.location.district}
                       </p>
                     )}
                   </div>
+                  {institution.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {institution.description}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

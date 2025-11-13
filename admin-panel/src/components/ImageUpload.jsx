@@ -206,7 +206,7 @@ function ImageUpload({
       {currentImageUrl && !selectedFile && (
         <Card className="w-full">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <img 
                   src={currentImageUrl} 
@@ -215,7 +215,7 @@ function ImageUpload({
                 />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">Imagen actual</p>
-                  <p className="text-sm text-muted-foreground truncate">
+                  <p className="text-sm text-muted-foreground break-words">
                     {currentImageUrl.split('/').pop()}
                   </p>
                 </div>
@@ -225,7 +225,7 @@ function ImageUpload({
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
-                className="flex-shrink-0"
+                className="flex-shrink-0 mt-1"
               >
                 Reemplazar
               </Button>
@@ -272,7 +272,7 @@ function ImageUpload({
             ) : (
             <div className="space-y-4">
               {/* Selected file info with preview */}
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg gap-3">
+              <div className="flex items-start justify-between p-3 bg-muted rounded-lg gap-3">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   {previewUrl ? (
                     <img 
@@ -286,7 +286,7 @@ function ImageUpload({
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{selectedFile.name}</p>
+                    <p className="font-medium break-words">{selectedFile.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {formatFileSize(selectedFile.size)}
                     </p>
@@ -298,6 +298,7 @@ function ImageUpload({
                     size="sm"
                     onClick={clearSelection}
                     disabled={disabled}
+                    className="flex-shrink-0 mt-1"
                   >
                     <X className="w-4 h-4" />
                   </Button>

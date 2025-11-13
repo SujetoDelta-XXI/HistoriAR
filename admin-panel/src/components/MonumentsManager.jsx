@@ -97,7 +97,7 @@ function MonumentsManager() {
       const [monumentsData, institutionsData, categoriesData] = await Promise.all([
         apiService.getMonuments(),
         apiService.getInstitutions({ availableOnly: true }), // Solo instituciones disponibles
-        apiService.getCategories()
+        apiService.getCategories({ activeOnly: true }) // Solo categorías activas para el formulario
       ]);
       
       setMonuments(monumentsData.items || monumentsData || []);
@@ -223,6 +223,7 @@ function MonumentsManager() {
               categories={categories}
               onClose={() => setIsCreateDialogOpen(false)}
               onSave={loadData}
+              toast={toast}
             />
           </DialogContent>
         </Dialog>
@@ -242,6 +243,7 @@ function MonumentsManager() {
               categories={categories}
               onClose={handleCloseEdit}
               onSave={loadData}
+              toast={toast}
             />
           </DialogContent>
         </Dialog>
@@ -492,7 +494,7 @@ function MonumentsManager() {
   );
 }
 
-function MonumentForm({ onClose, monument = null, institutions = [], categories = [], onSave }) {
+function MonumentForm({ onClose, monument = null, institutions = [], categories = [], onSave, toast }) {
   const [formData, setFormData] = useState({
     name: monument?.name || '',
     categoryId: monument?.categoryId || '',
@@ -513,6 +515,56 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
     imageUrl: monument?.imageUrl || null
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Validaciones
+  const validateForm = () => {
+    // Validar nombre
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error de validación",
+        description: "El nombre del monumento es requerido",
+        variant: "warning"
+      });
+      return false;
+    }
+
+    // Validar categoría
+    if (!formData.categoryId) {
+      toast({
+        title: "Error de validación",
+        description: "Debes seleccionar una categoría",
+        variant: "warning"
+      });
+      return false;
+    }
+
+    // Validar años del período
+    if (formData.period.startYear && formData.period.endYear) {
+      const startYear = parseInt(formData.period.startYear);
+      const endYear = parseInt(formData.period.endYear);
+      
+      if (endYear < startYear) {
+        toast({
+          title: "Error de validación",
+          description: "El año de fin no puede ser menor al año de inicio",
+          variant: "warning"
+        });
+        return false;
+      }
+    }
+
+    // Validar coordenadas (si se proporciona una, se debe proporcionar la otra)
+    if ((formData.location.lat && !formData.location.lng) || (!formData.location.lat && formData.location.lng)) {
+      toast({
+        title: "Error de validación",
+        description: "Debes proporcionar tanto latitud como longitud, o ninguna",
+        variant: "warning"
+      });
+      return false;
+    }
+
+    return true;
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -547,6 +599,11 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
   };
 
   const handleSubmit = async () => {
+    // Validar formulario antes de enviar
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -756,6 +813,7 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
               onUploadError={handleImageUploadError}
               disabled={isSubmitting}
               monumentId={monument?._id}
+              entityType="monuments"
             />
           </div>
           {!formData.imageUrl && (
@@ -791,6 +849,7 @@ MonumentForm.propTypes = {
   institutions: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
   onSave: PropTypes.func.isRequired,
+  toast: PropTypes.func.isRequired,
 };
 
 export default MonumentsManager;
