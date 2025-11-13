@@ -8,6 +8,12 @@ export async function listMonument(req, res) {
     const filter = {};
     if (req.query.category) filter.category = req.query.category;
     if (req.query.status)   filter.status   = req.query.status;
+    
+    // Support availableOnly filter
+    if (req.query.availableOnly === 'true') {
+      filter.status = 'Disponible';
+    }
+    
     const { items, total } = await getAllMonuments(filter, { skip, limit, populate: req.query.populate === 'true' });
     res.json({ page, total, items });
   } catch (err) { res.status(500).json({ message: err.message }); }
@@ -67,6 +73,21 @@ export async function createMonumentController(req, res) {
 export async function updateMonumentController(req, res) {
   try {
     const data = { ...req.body };
+    
+    // Get current monument to check status change
+    const currentMonument = await getMonumentById(req.params.id);
+    if (!currentMonument) {
+      return res.status(404).json({ message: 'Monumento no encontrado' });
+    }
+    
+    // Validate status change to "Disponible"
+    if (data.status === 'Disponible' && currentMonument.status !== 'Disponible') {
+      if (!currentMonument.imageUrl && !data.imageUrl) {
+        return res.status(400).json({ 
+          message: 'No se puede hacer disponible un monumento sin imagen. Por favor, agrega una imagen primero.' 
+        });
+      }
+    }
     
     // Handle image upload to GCS
     if (req.files?.image?.[0]) {
@@ -144,5 +165,88 @@ export async function getFilterOptionsController(req, res) {
     res.json(options);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+}
+
+/**
+ * Obtener historial de versiones de modelo 3D
+ */
+export async function getModelVersionsController(req, res) {
+  try {
+    const versions = await gcsService.getFileHistory(req.params.id);
+    res.json({ total: versions.length, items: versions });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+
+/**
+ * Activate a specific model version
+ */
+export async function activateModelVersionController(req, res) {
+  try {
+    const version = await gcsService.activateVersion(req.params.id, req.params.versionId);
+    res.json({ message: 'Version activated successfully', version });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+/**
+ * Eliminar versión de modelo 3D
+ */
+export async function deleteModelVersionController(req, res) {
+  try {
+    await gcsService.deleteVersion(req.params.id, req.params.versionId);
+    res.json({ message: 'Version deleted successfully' });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+/**
+ * Upload a new 3D model version for a monument
+ */
+export async function uploadModelVersionController(req, res) {
+  try {
+    // Validate that a file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: 'No model file provided' });
+    }
+
+    const monumentId = req.params.id;
+    const userId = req.user?.sub || req.user?.id || req.user?._id;
+
+    if (!userId) {
+      console.error('User ID not found in request:', req.user);
+      return res.status(401).json({ message: 'User authentication failed' });
+    }
+
+    // Validate the model file
+    try {
+      gcsService.validateModelFile(req.file);
+    } catch (validationError) {
+      return res.status(400).json({ message: validationError.message });
+    }
+
+    // Upload model with versioning
+    const result = await gcsService.uploadModelWithVersioning(
+      req.file.buffer,
+      monumentId,
+      req.file.originalname,
+      req.file.mimetype,
+      userId
+    );
+
+    res.status(201).json({
+      versionId: result.versionId,
+      url: result.url,
+      filename: result.filename,
+      message: 'Model version uploaded successfully'
+    });
+  } catch (err) {
+    console.error('Error uploading model version:', err);
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ message: err.message || 'Internal server error' });
   }
 }

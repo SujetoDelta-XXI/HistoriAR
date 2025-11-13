@@ -1,9 +1,11 @@
 import Institution from '../models/Institution.js';
 
-export async function getAllInstitutions({ skip = 0, limit = 10 } = {}) {
+export async function getAllInstitutions({ skip = 0, limit = 10, availableOnly = false } = {}) {
+  const filter = availableOnly ? { status: 'Disponible' } : {};
+  
   const [items, total] = await Promise.all([
-    Institution.find().skip(skip).limit(limit),
-    Institution.countDocuments()
+    Institution.find(filter).skip(skip).limit(limit),
+    Institution.countDocuments(filter)
   ]);
   return { items, total };
 }

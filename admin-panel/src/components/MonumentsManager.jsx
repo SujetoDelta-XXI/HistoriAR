@@ -48,12 +48,12 @@ import {
   Eye,
   Trash2,
   MapPin,
-  Calendar,
+  Box,
   Loader2
 } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import ModelUpload from './ModelUpload';
 import ImageUpload from './ImageUpload';
+import { useToast } from './ui/toast';
 import apiService from '../services/api';
 import PropTypes from 'prop-types';
 
@@ -74,6 +74,7 @@ const statusColors = {
 };
 
 function MonumentsManager() {
+  const { toast } = useToast();
   const [monuments, setMonuments] = useState([]);
   const [institutions, setInstitutions] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -95,8 +96,8 @@ function MonumentsManager() {
       setLoading(true);
       const [monumentsData, institutionsData, categoriesData] = await Promise.all([
         apiService.getMonuments(),
-        apiService.getInstitutions(),
-        apiService.getCategories()
+        apiService.getInstitutions({ availableOnly: true }), // Solo instituciones disponibles
+        apiService.getCategories({ activeOnly: true }) // Solo categorías activas para el formulario
       ]);
       
       setMonuments(monumentsData.items || monumentsData || []);
@@ -110,19 +111,36 @@ function MonumentsManager() {
   };
 
   // Filtro compuesto por término de búsqueda, categoría y estado
-  const filteredMonuments = monuments.filter(monument => {
-    const matchesSearch = monument.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         monument.location?.district?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || monument.categoryId === selectedCategory;
-    const matchesStatus = selectedStatus === 'all' || monument.status === selectedStatus;
-    
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  const filteredMonuments = monuments
+    .filter(monument => {
+      const matchesSearch = monument.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           monument.location?.district?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || monument.categoryId === selectedCategory;
+      const matchesStatus = selectedStatus === 'all' || monument.status === selectedStatus;
+      
+      return matchesSearch && matchesCategory && matchesStatus;
+    })
+    .sort((a, b) => {
+      // Organizar monumentos: con modelos primero, sin modelos después
+      const aHasModel = Boolean(a.model3DUrl);
+      const bHasModel = Boolean(b.model3DUrl);
+      
+      if (aHasModel && !bHasModel) return -1;
+      if (!aHasModel && bHasModel) return 1;
+      
+      // Si ambos tienen o no tienen modelo, mantener orden alfabético
+      return a.name.localeCompare(b.name);
+    });
 
   // Función para obtener el nombre de la categoría
   const getCategoryName = (categoryId) => {
     const category = categories.find(c => c._id === categoryId);
     return category?.name || 'Sin categoría';
+  };
+
+  // Verificar si el monumento está completo (tiene imagen y modelo 3D)
+  const isMonumentComplete = (monument) => {
+    return monument.imageUrl && monument.model3DUrl;
   };
 
   // Cambiar estado del monumento
@@ -136,8 +154,20 @@ function MonumentsManager() {
             : monument
         )
       );
+      toast({
+        title: "Estado actualizado",
+        description: `El monumento ahora está ${newStatus.toLowerCase()}`,
+        variant: "success"
+      });
     } catch (error) {
       console.error('Error updating monument status:', error);
+      toast({
+        title: "Error",
+        description: error.message || 'Error al cambiar el estado del monumento',
+        variant: "error"
+      });
+      // Recargar para asegurar consistencia
+      loadData();
     }
   };
 
@@ -193,6 +223,7 @@ function MonumentsManager() {
               categories={categories}
               onClose={() => setIsCreateDialogOpen(false)}
               onSave={loadData}
+              toast={toast}
             />
           </DialogContent>
         </Dialog>
@@ -212,6 +243,7 @@ function MonumentsManager() {
               categories={categories}
               onClose={handleCloseEdit}
               onSave={loadData}
+              toast={toast}
             />
           </DialogContent>
         </Dialog>
@@ -312,7 +344,7 @@ function MonumentsManager() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-4 h-4 text-purple-600" />
+                <Box className="w-4 h-4 text-purple-600" />
               </div>
               <div>
                 <p className="text-sm font-medium">Con Modelo 3D</p>
@@ -422,9 +454,15 @@ function MonumentsManager() {
                           {monument.status === 'Oculto' && (
                             <DropdownMenuItem 
                               onClick={() => handleStatusChange(monument._id, 'Disponible')}
+                              disabled={!isMonumentComplete(monument)}
                             >
                               <Eye className="mr-2 h-4 w-4" />
                               Hacer disponible
+                              {!isMonumentComplete(monument) && (
+                                <span className="ml-2 text-xs">
+                                  (requiere {!monument.imageUrl && 'imagen'}{!monument.imageUrl && !monument.model3DUrl && ' y '}{!monument.model3DUrl && 'modelo 3D'})
+                                </span>
+                              )}
                             </DropdownMenuItem>
                           )}
                           {monument.status === 'Disponible' && (
@@ -456,7 +494,7 @@ function MonumentsManager() {
   );
 }
 
-function MonumentForm({ onClose, monument = null, institutions = [], categories = [], onSave }) {
+function MonumentForm({ onClose, monument = null, institutions = [], categories = [], onSave, toast }) {
   const [formData, setFormData] = useState({
     name: monument?.name || '',
     categoryId: monument?.categoryId || '',
@@ -474,22 +512,81 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
       startYear: monument?.period?.startYear || '',
       endYear: monument?.period?.endYear || ''
     },
-    model3DUrl: monument?.model3DUrl || null,
     imageUrl: monument?.imageUrl || null
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Validaciones
+  const validateForm = () => {
+    // Validar nombre
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error de validación",
+        description: "El nombre del monumento es requerido",
+        variant: "warning"
+      });
+      return false;
+    }
+
+    // Validar categoría
+    if (!formData.categoryId) {
+      toast({
+        title: "Error de validación",
+        description: "Debes seleccionar una categoría",
+        variant: "warning"
+      });
+      return false;
+    }
+
+    // Validar años del período
+    if (formData.period.startYear && formData.period.endYear) {
+      const startYear = parseInt(formData.period.startYear);
+      const endYear = parseInt(formData.period.endYear);
+      
+      if (endYear < startYear) {
+        toast({
+          title: "Error de validación",
+          description: "El año de fin no puede ser menor al año de inicio",
+          variant: "warning"
+        });
+        return false;
+      }
+    }
+
+    // Validar coordenadas (si se proporciona una, se debe proporcionar la otra)
+    if ((formData.location.lat && !formData.location.lng) || (!formData.location.lat && formData.location.lng)) {
+      toast({
+        title: "Error de validación",
+        description: "Debes proporcionar tanto latitud como longitud, o ninguna",
+        variant: "warning"
+      });
+      return false;
+    }
+
+    return true;
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleModelUpload = (modelUrl, fileName) => {
-    setFormData(prev => ({ ...prev, model3DUrl: modelUrl }));
-  };
-
-  const handleModelUploadError = (error) => {
-    console.error('Error uploading model:', error);
-    // Handle error (could show toast notification)
+  // Manejar cambio de institución y auto-completar distrito y dirección
+  const handleInstitutionChange = (institutionId) => {
+    const selectedInstitution = institutions.find(inst => inst._id === institutionId);
+    
+    if (selectedInstitution) {
+      setFormData(prev => ({
+        ...prev,
+        institutionId: institutionId,
+        location: {
+          ...prev.location,
+          district: selectedInstitution.location?.district || prev.location.district,
+          address: selectedInstitution.location?.address || prev.location.address
+        }
+      }));
+    } else {
+      handleInputChange('institutionId', institutionId);
+    }
   };
 
   const handleImageUpload = (imageUrl, fileName) => {
@@ -502,6 +599,11 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
   };
 
   const handleSubmit = async () => {
+    // Validar formulario antes de enviar
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -509,15 +611,38 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
         // Actualizar monumento existente
         await apiService.updateMonument(monument._id, formData);
       } else {
-        // Crear nuevo monumento
-        await apiService.createMonument(formData);
+        // Crear nuevo monumento con estado "Oculto" por defecto
+        const newMonumentData = {
+          ...formData,
+          status: 'Oculto' // Estado por defecto para monumentos nuevos
+        };
+        await apiService.createMonument(newMonumentData);
       }
       
       onSave(); // Recargar la lista
       onClose();
+      
+      // Mostrar mensaje informativo al crear
+      if (!monument) {
+        toast({
+          title: "Monumento creado exitosamente",
+          description: "Edita el monumento para agregar una imagen y modelo 3D para poder hacerlo disponible en la aplicación.",
+          variant: "success"
+        });
+      } else {
+        toast({
+          title: "Monumento actualizado",
+          description: "Los cambios se guardaron correctamente.",
+          variant: "success"
+        });
+      }
     } catch (error) {
       console.error('Error saving monument:', error);
-      alert('Error al guardar el monumento: ' + error.message);
+      toast({
+        title: "Error",
+        description: 'Error al guardar el monumento: ' + error.message,
+        variant: "error"
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -572,7 +697,7 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
           <Label htmlFor="institutionId">Institución</Label>
           <Select 
             value={formData.institutionId} 
-            onValueChange={(value) => handleInputChange('institutionId', value)}
+            onValueChange={handleInstitutionChange}
           >
             <SelectTrigger>
               <SelectValue placeholder="Seleccionar institución" />
@@ -677,36 +802,27 @@ function MonumentForm({ onClose, monument = null, institutions = [], categories 
         />
       </div>
 
-      {/* Image Upload Section */}
-      <div>
-        <Label>Imagen del monumento</Label>
-        <div className="mt-2">
-          <ImageUpload
-            currentImageUrl={formData.imageUrl}
-            onUploadComplete={handleImageUpload}
-            onUploadError={handleImageUploadError}
-            disabled={isSubmitting}
-          />
+      {/* Image Upload Section - Only show when editing */}
+      {isEditing && (
+        <div>
+          <Label>Imagen del monumento</Label>
+          <div className="mt-2">
+            <ImageUpload
+              currentImageUrl={formData.imageUrl}
+              onUploadComplete={handleImageUpload}
+              onUploadError={handleImageUploadError}
+              disabled={isSubmitting}
+              monumentId={monument?._id}
+              entityType="monuments"
+            />
+          </div>
+          {!formData.imageUrl && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Agrega una imagen para poder hacer el monumento disponible
+            </p>
+          )}
         </div>
-      </div>
-
-      {/* 3D Model Upload Section */}
-      <div>
-        <Label>Modelo 3D</Label>
-        <div className="mt-2">
-          <ModelUpload
-            currentModelUrl={formData.model3DUrl}
-            onUploadComplete={handleModelUpload}
-            onUploadError={handleModelUploadError}
-            disabled={isSubmitting}
-          />
-        </div>
-        {formData.model3DUrl && (
-          <p className="text-sm text-muted-foreground mt-2">
-            Modelo actual: {formData.model3DUrl.split('/').pop()}
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="flex justify-end gap-2 pt-4">
         <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
@@ -733,6 +849,7 @@ MonumentForm.propTypes = {
   institutions: PropTypes.array.isRequired,
   categories: PropTypes.array.isRequired,
   onSave: PropTypes.func.isRequired,
+  toast: PropTypes.func.isRequired,
 };
 
 export default MonumentsManager;

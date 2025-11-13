@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import Toaster from './components/ui/sonner';
+import { ToastProvider } from './components/ui/toast';
 import LoginForm from './components/LoginForm';
 import AppSidebar from './components/AppSidebar';
 import Dashboard from './components/Dashboard';
@@ -10,6 +11,10 @@ import InstitutionsManager from './components/InstitutionsManager';
 import CategoriesManager from './components/CategoriesManager';
 import UsersManager from './components/UsersManager';
 import AnalyticsView from './components/AnalyticsView';
+import ToursManager from './components/ToursManager';
+import ARExperiencesManager from './components/ARExperiencesManager';
+import HistoricalDataManager from './components/HistoricalDataManager';
+import QuizzesManager from './components/QuizzesManager';
 import { SidebarProvider, SidebarInset } from './components/ui/sidebar';
 
 function AppContent() {
@@ -42,12 +47,13 @@ function AppContent() {
       case 'categories':
         return <CategoriesManager />;
       case 'quizzes':
-        return (
-          <div className="p-6">
-            <h1>Experiencias AR (Quizzes)</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
+        return <ARExperiencesManager />;
+      case 'quiz-manager':
+        return <QuizzesManager />;
+      case 'tours':
+        return <ToursManager />;
+      case 'historical-data':
+        return <HistoricalDataManager />;
       case 'users':
         return <UsersManager />;
       case 'messaging':
@@ -77,8 +83,10 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
-      <Toaster />
+      <ToastProvider>
+        <AppContent />
+        <Toaster />
+      </ToastProvider>
     </AuthProvider>
   );
 }

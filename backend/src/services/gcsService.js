@@ -1,5 +1,7 @@
 import { bucket } from '../config/gcs.js';
 import { v4 as uuidv4 } from 'uuid';
+import ModelVersion from '../models/ModelVersion.js';
+import Monument from '../models/Monument.js';
 
 class GCSService {
   constructor() {
@@ -118,6 +120,201 @@ class GCSService {
   }
 
   /**
+   * Upload modelo 3D con versionado
+   * Estructura: models/monuments/{monumentId}/{timestamp}_{filename}
+   * @param {Buffer} fileBuffer - File buffer
+   * @param {string} monumentId - Monument ID for folder organization
+   * @param {string} originalFilename - Original filename from upload
+   * @param {string} mimeType - File MIME type
+   * @param {string} userId - User ID who uploaded
+   * @returns {Promise<{url: string, filename: string, versionId: string}>}
+   */
+  async uploadModelWithVersioning(fileBuffer, monumentId, originalFilename, mimeType, userId) {
+    try {
+      // Generate timestamp for version
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      
+      // Sanitize original filename (keep only alphanumeric, dots, and hyphens)
+      const sanitizedFilename = originalFilename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      
+      // Create path with structure: models/monuments/{monumentId}/{timestamp}_{filename}
+      const filename = `models/monuments/${monumentId}/${timestamp}_${sanitizedFilename}`;
+
+      // Upload file to GCS (folder is created automatically)
+      const file = this.bucket.file(filename);
+      await file.save(fileBuffer, {
+        metadata: { contentType: mimeType }
+      });
+
+      // Generate public URL
+      const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${filename}`;
+
+      // Deactivate previous active version
+      await ModelVersion.updateMany(
+        { monumentId: monumentId, isActive: true },
+        { isActive: false }
+      );
+
+      // Create ModelVersion record
+      const modelVersion = new ModelVersion({
+        monumentId: monumentId,
+        filename: filename,
+        url: publicUrl,
+        uploadedBy: userId,
+        isActive: true,
+        fileSize: fileBuffer.length
+      });
+
+      await modelVersion.save();
+
+      // Update Monument's active model reference
+      await Monument.findByIdAndUpdate(monumentId, {
+        model3DUrl: publicUrl,
+        gcsModelFileName: filename
+      });
+
+      return {
+        url: publicUrl,
+        filename: filename,
+        versionId: modelVersion._id
+      };
+    } catch (error) {
+      console.error('Error uploading model with versioning:', error);
+      throw new Error(`Failed to upload model: ${error.message}`);
+    }
+  }
+
+  /**
+   * Upload imagen con estructura organizada por monumentId
+   * Estructura: 
+   * - images/monuments/{monumentId}/{timestamp}_{filename} (imagen principal del monumento)
+   * - images/monuments/{monumentId}/fichas/{timestamp}_{filename} (fichas históricas)
+   * @param {Buffer} fileBuffer - File buffer
+   * @param {string} monumentId - Monument ID for folder organization
+   * @param {string} originalFilename - Original filename from upload
+   * @param {string} mimeType - File MIME type
+   * @param {boolean} isHistoricalData - If true, saves in fichas subfolder
+   * @returns {Promise<{url: string, filename: string}>}
+   */
+  async uploadImageWithVersioning(fileBuffer, monumentId, originalFilename, mimeType, isHistoricalData = false) {
+    try {
+      // Generate timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      
+      // Sanitize original filename (keep only alphanumeric, dots, and hyphens)
+      const sanitizedFilename = originalFilename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      
+      // Create path with structure based on usage
+      const basePath = `images/monuments/${monumentId}`;
+      const subPath = isHistoricalData ? '/fichas' : '';
+      const filename = `${basePath}${subPath}/${timestamp}_${sanitizedFilename}`;
+
+      // Upload file to GCS (folder is created automatically)
+      const file = this.bucket.file(filename);
+      await file.save(fileBuffer, {
+        metadata: { contentType: mimeType }
+      });
+
+      // Generate public URL
+      const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${filename}`;
+
+      return {
+        url: publicUrl,
+        filename: filename
+      };
+    } catch (error) {
+      console.error('Error uploading image with versioning:', error);
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
+  }
+
+  /**
+   * Obtener historial de versiones de un monumento
+   * @param {string} monumentId - Monument ID
+   * @returns {Promise<Array>}
+   */
+  async getFileHistory(monumentId) {
+    try {
+      return await ModelVersion.find({ monumentId })
+        .sort({ uploadedAt: -1 })
+        .populate('uploadedBy', 'name email');
+    } catch (error) {
+      console.error('Error getting file history:', error);
+      throw new Error(`Failed to get file history: ${error.message}`);
+    }
+  }
+
+  /**
+   * Activate a specific model version
+   * @param {string} monumentId - Monument ID
+   * @param {string} versionId - Version ID to activate
+   * @returns {Promise<Object>}
+   */
+  async activateVersion(monumentId, versionId) {
+    try {
+      // Deactivate current active version
+      await ModelVersion.updateMany(
+        { monumentId, isActive: true },
+        { isActive: false }
+      );
+
+      // Activate selected version
+      const version = await ModelVersion.findByIdAndUpdate(
+        versionId,
+        { isActive: true },
+        { new: true }
+      );
+
+      if (!version) {
+        throw new Error('Version not found');
+      }
+
+      // Update Monument's active model reference
+      await Monument.findByIdAndUpdate(monumentId, {
+        model3DUrl: version.url,
+        gcsModelFileName: version.filename
+      });
+
+      return version;
+    } catch (error) {
+      console.error('Error activating version:', error);
+      throw new Error(`Failed to activate version: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete a model version
+   * @param {string} monumentId - Monument ID
+   * @param {string} versionId - Version ID to delete
+   * @returns {Promise<boolean>}
+   */
+  async deleteVersion(monumentId, versionId) {
+    try {
+      const version = await ModelVersion.findOne({ _id: versionId, monumentId });
+      
+      if (!version) {
+        throw new Error('Version not found');
+      }
+
+      if (version.isActive) {
+        throw new Error('Cannot delete active version. Please activate another version first.');
+      }
+
+      // Delete file from GCS
+      const file = this.bucket.file(version.filename);
+      await file.delete();
+
+      // Delete ModelVersion record
+      await ModelVersion.findByIdAndDelete(versionId);
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting version:', error);
+      throw new Error(`Failed to delete version: ${error.message}`);
+    }
+  }
+
+  /**
    * Validate file for 3D model upload
    * @param {Object} file - Multer file object
    * @returns {boolean}
@@ -125,11 +322,11 @@ class GCSService {
   validateModelFile(file) {
     const allowedMimeTypes = ['model/gltf-binary', 'model/gltf+json'];
     const allowedExtensions = ['.glb', '.gltf'];
-    const maxSize = 100 * 1024 * 1024; // 100MB
+    const maxSize = 50 * 1024 * 1024; // 50MB (actualizado de 100MB)
 
     // Check file size
     if (file.size > maxSize) {
-      throw new Error('File size exceeds 100MB limit');
+      throw new Error('File size exceeds 50MB limit');
     }
 
     // Check file extension

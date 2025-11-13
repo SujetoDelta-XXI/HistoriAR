@@ -9,6 +9,13 @@
     "dev": "nodemon src/server.js",
     "setup:gcs": "node scripts/setup-gcs.js",
     "migrate:gcs": "node scripts/migrate-to-gcs.js",
+    "migrate": "node scripts/runMigrations.js",
+    "migrate:institutions": "node src/migrations/addLocationToInstitutions.js",
+    "migrate:quizzes": "node src/migrations/migrateQuizStructure.js",
+    "migrate:gcs-structure": "node src/migrations/migrateGCSStructure.js",
+    "indexes": "node scripts/createIndexes.js",
+    "verify": "node scripts/verifyConfig.js",
+    "deploy:prepare": "npm run verify && npm run migrate && npm run indexes",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui"

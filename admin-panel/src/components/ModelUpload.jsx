@@ -18,6 +18,7 @@ import {
   Loader2 
 } from 'lucide-react';
 import PropTypes from 'prop-types';
+import apiService from '../services/api';
 
 const ACCEPTED_FORMATS = ['.glb', '.gltf'];
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
@@ -25,6 +26,8 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
 function ModelUpload({ 
   onUploadComplete, 
   onUploadError, 
+  monumentId,
+  monumentName,
   currentModelUrl = null,
   disabled = false 
 }) {
@@ -108,17 +111,25 @@ function ModelUpload({
     }
   }, [disabled, handleFileSelect]);
 
+  // Limpiar selección
+  const clearSelection = useCallback(() => {
+    setSelectedFile(null);
+    setUploadStatus('idle');
+    setUploadProgress(0);
+    setErrorMessage('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
   // Subir archivo con progreso simulado
   const uploadFile = useCallback(async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !monumentId) return;
     
     setUploadStatus('uploading');
     setUploadProgress(0);
     
     try {
-      const formData = new FormData();
-      formData.append('model', selectedFile);
-      
       // Simular progreso de subida
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
@@ -130,30 +141,23 @@ function ModelUpload({
         });
       }, 200);
       
-      // Endpoint de API para subida de modelos
-      const response = await fetch('http://localhost:4000/api/monuments/upload-model', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData,
-      });
+      // Usar el servicio API para subir el modelo
+      const result = await apiService.uploadModelVersion(monumentId, selectedFile);
       
       clearInterval(progressInterval);
-      
-      if (!response.ok) {
-        throw new Error(`Error de carga: ${response.status}`);
-      }
-      
-      const result = await response.json();
       
       setUploadProgress(100);
       setUploadStatus('success');
       
-      // Llamar callback de éxito con la URL de GCS
+      // Llamar callback de éxito con los datos del resultado
       if (onUploadComplete) {
-        onUploadComplete(result.modelUrl, selectedFile.name);
+        onUploadComplete(result);
       }
+      
+      // Limpiar después de un breve delay
+      setTimeout(() => {
+        clearSelection();
+      }, 2000);
       
     } catch (error) {
       setUploadStatus('error');
@@ -163,18 +167,7 @@ function ModelUpload({
         onUploadError(error);
       }
     }
-  }, [selectedFile, onUploadComplete, onUploadError]);
-
-  // Limpiar selección
-  const clearSelection = useCallback(() => {
-    setSelectedFile(null);
-    setUploadStatus('idle');
-    setUploadProgress(0);
-    setErrorMessage('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, []);
+  }, [selectedFile, monumentId, onUploadComplete, onUploadError, clearSelection]);
 
   // Formatear tamaño de archivo para mostrar
   const formatFileSize = (bytes) => {
@@ -234,6 +227,11 @@ function ModelUpload({
               </div>
               <div>
                 <h3 className="font-medium">Subir modelo 3D</h3>
+                {monumentName && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Para: <span className="font-medium">{monumentName}</span>
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground mt-1">
                   Arrastra y suelta tu archivo aquí, o{' '}
                   <button
@@ -347,6 +345,8 @@ function ModelUpload({
 ModelUpload.propTypes = {
   onUploadComplete: PropTypes.func,
   onUploadError: PropTypes.func,
+  monumentId: PropTypes.string.isRequired,
+  monumentName: PropTypes.string,
   currentModelUrl: PropTypes.string,
   disabled: PropTypes.bool,
 };

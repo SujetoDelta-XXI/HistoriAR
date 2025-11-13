@@ -1,13 +1,15 @@
 import Category from '../models/Category.js';
 import Monument from '../models/Monument.js';
 
-export async function getAllCategories({ skip = 0, limit = 50 } = {}) {
-  const items = await Category.find({ isActive: true })
+export async function getAllCategories({ skip = 0, limit = 50, activeOnly = false } = {}) {
+  const filter = activeOnly ? { isActive: true } : {};
+  
+  const items = await Category.find(filter)
     .sort({ name: 1 })
     .skip(skip)
     .limit(limit);
   
-  const total = await Category.countDocuments({ isActive: true });
+  const total = await Category.countDocuments(filter);
   
   return { items, total };
 }

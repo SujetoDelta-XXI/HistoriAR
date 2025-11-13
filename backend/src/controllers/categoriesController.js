@@ -4,7 +4,8 @@ import { getAllCategories, getCategoryById, createCategory, updateCategory, dele
 export async function listCategories(req, res) {
   try {
     const { skip, limit, page } = buildPagination(req.query);
-    const { items, total } = await getAllCategories({ skip, limit });
+    const activeOnly = req.query.activeOnly === 'true';
+    const { items, total } = await getAllCategories({ skip, limit, activeOnly });
     res.json({ page, total, items });
   } catch (err) { 
     res.status(500).json({ message: err.message }); 

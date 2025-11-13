@@ -26,7 +26,9 @@ function ImageUpload({
   onUploadComplete, 
   onUploadError, 
   currentImageUrl = null,
-  disabled = false 
+  disabled = false,
+  monumentId = null, // Optional: if provided, uses structured path
+  entityType = 'monuments' // 'monuments' or 'institutions'
 }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -123,6 +125,9 @@ function ImageUpload({
     try {
       const formData = new FormData();
       formData.append('image', selectedFile);
+      if (monumentId) {
+        formData.append('monumentId', monumentId);
+      }
       
       // Simular progreso de subida
       const progressInterval = setInterval(() => {
@@ -135,8 +140,9 @@ function ImageUpload({
         });
       }, 200);
       
-      // Endpoint de API para subida de imágenes
-      const response = await fetch('http://localhost:4000/api/monuments/upload-image', {
+      // Endpoint de API para subida de imágenes (dinámico según el tipo de entidad)
+      const endpoint = `http://localhost:4000/api/${entityType}/upload-image`;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -196,20 +202,20 @@ function ImageUpload({
 
   return (
     <div className="space-y-4">
-      {/* Current image display */}
+      {/* Current image display - Solo se muestra cuando hay imagen y no hay archivo seleccionado */}
       {currentImageUrl && !selectedFile && (
-        <Card>
+        <Card className="w-full">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 <img 
                   src={currentImageUrl} 
                   alt="Imagen actual" 
-                  className="w-16 h-16 object-cover rounded-lg"
+                  className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                 />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-medium">Imagen actual</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground break-words">
                     {currentImageUrl.split('/').pop()}
                   </p>
                 </div>
@@ -219,6 +225,7 @@ function ImageUpload({
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
+                className="flex-shrink-0 mt-1"
               >
                 Reemplazar
               </Button>
@@ -227,58 +234,59 @@ function ImageUpload({
         </Card>
       )}
 
-      {/* Upload area */}
-      <Card 
-        className={`transition-colors ${
-          dragActive ? 'border-primary bg-primary/5' : ''
-        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        <CardContent className="p-6">
-          {!selectedFile ? (
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Upload className="w-8 h-8 text-muted-foreground" />
+      {/* Upload area - Solo se muestra cuando NO hay imagen actual O cuando se selecciona un archivo */}
+      {(!currentImageUrl || selectedFile) && (
+        <Card 
+          className={`w-full ${
+            dragActive ? 'border-primary bg-primary/5' : ''
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+        >
+          <CardContent className="p-6">
+            {!selectedFile ? (
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                  <Upload className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Subir imagen</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Arrastra y suelta tu imagen aquí, o{' '}
+                    <button
+                      type="button"
+                      className="text-primary hover:underline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={disabled}
+                    >
+                      selecciona un archivo
+                    </button>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Formatos: {ACCEPTED_FORMATS.join(', ')} • Máximo: 10MB
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-medium">Subir imagen</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Arrastra y suelta tu imagen aquí, o{' '}
-                  <button
-                    type="button"
-                    className="text-primary hover:underline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={disabled}
-                  >
-                    selecciona un archivo
-                  </button>
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Formatos: {ACCEPTED_FORMATS.join(', ')} • Máximo: 10MB
-                </p>
-              </div>
-            </div>
-          ) : (
+            ) : (
             <div className="space-y-4">
               {/* Selected file info with preview */}
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div className="flex items-center gap-3">
+              <div className="flex items-start justify-between p-3 bg-muted rounded-lg gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   {previewUrl ? (
                     <img 
                       src={previewUrl} 
                       alt="Vista previa" 
-                      className="w-16 h-16 object-cover rounded-lg"
+                      className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                     />
                   ) : (
-                    <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       <ImageIcon className="w-8 h-8 text-blue-600" />
                     </div>
                   )}
-                  <div>
-                    <p className="font-medium">{selectedFile.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium break-words">{selectedFile.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {formatFileSize(selectedFile.size)}
                     </p>
@@ -290,6 +298,7 @@ function ImageUpload({
                     size="sm"
                     onClick={clearSelection}
                     disabled={disabled}
+                    className="flex-shrink-0 mt-1"
                   >
                     <X className="w-4 h-4" />
                   </Button>
@@ -339,8 +348,9 @@ function ImageUpload({
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Error message */}
       {uploadStatus === 'error' && errorMessage && (
@@ -368,6 +378,8 @@ ImageUpload.propTypes = {
   onUploadError: PropTypes.func,
   currentImageUrl: PropTypes.string,
   disabled: PropTypes.bool,
+  monumentId: PropTypes.string, // Optional: for structured path
+  entityType: PropTypes.oneOf(['monuments', 'institutions']), // Type of entity
 };
 
 export default ImageUpload;

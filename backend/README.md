@@ -186,3 +186,383 @@ npm run test:watch
 ## 📄 Licencia
 
 Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
+
+#
+# 🚀 Deployment y Migraciones
+
+### Preparación para Deployment
+
+Antes de desplegar a producción, ejecuta el script de preparación completo:
+
+```bash
+npm run deploy:prepare
+```
+
+Este comando ejecuta automáticamente:
+1. Verificación de configuración (`npm run verify`)
+2. Migraciones de base de datos (`npm run migrate`)
+3. Creación de índices (`npm run indexes`)
+
+### Scripts de Deployment Individuales
+
+#### 1. Verificar Configuración
+
+Verifica que todas las variables de entorno estén configuradas correctamente:
+
+```bash
+npm run verify
+```
+
+Este script verifica:
+- Variables de entorno requeridas
+- Conexión a MongoDB
+- Acceso a Google Cloud Storage
+- Configuración de GCS bucket
+
+#### 2. Ejecutar Migraciones
+
+Ejecuta todas las migraciones en orden:
+
+```bash
+npm run migrate
+```
+
+O ejecuta migraciones individuales:
+
+```bash
+# Agregar location a instituciones
+npm run migrate:institutions
+
+# Migrar estructura de quizzes
+npm run migrate:quizzes
+
+# Migrar estructura de archivos en GCS
+npm run migrate:gcs-structure
+```
+
+**Importante:** Las migraciones de GCS NO eliminan archivos antiguos automáticamente. Verifica que todo funcione antes de eliminar archivos manualmente.
+
+#### 3. Crear Índices
+
+Crea todos los índices necesarios en MongoDB:
+
+```bash
+npm run indexes
+```
+
+Este script crea índices para:
+- Tour (institutionId, isActive, type)
+- QuizAttempt (userId, quizId, completedAt)
+- UserPreferences (userId)
+- ModelVersion (monumentId, uploadedAt, isActive)
+- Quiz (monumentId)
+- Institution (location)
+- Monument (status, categoryId, institutionId)
+
+### Orden Recomendado de Deployment
+
+1. **Staging Environment:**
+   ```bash
+   # 1. Verificar configuración
+   npm run verify
+   
+   # 2. Ejecutar migraciones
+   npm run migrate
+   
+   # 3. Crear índices
+   npm run indexes
+   
+   # 4. Iniciar servidor
+   npm start
+   
+   # 5. Verificar logs y probar endpoints
+   ```
+
+2. **Production Environment:**
+   ```bash
+   # Usar el comando completo de preparación
+   npm run deploy:prepare
+   
+   # Si todo está OK, iniciar servidor
+   npm start
+   ```
+
+### Rollback de Migraciones
+
+Las migraciones NO son reversibles automáticamente. Si necesitas hacer rollback:
+
+1. **Instituciones:** Elimina el campo `location` manualmente en MongoDB
+2. **Quizzes:** Restaura backup de la colección
+3. **GCS:** Los archivos antiguos se mantienen, solo actualiza las URLs en Monument
+
+**Recomendación:** Siempre haz backup de la base de datos antes de ejecutar migraciones en producción.
+
+## 📊 Nuevas Funcionalidades (v2.0)
+
+### Sistema de Tours
+- CRUD completo de recorridos turísticos
+- Monumentos ordenados con descripciones
+- Filtros por institución y tipo
+- API: `/api/tours`
+
+### Geolocalización
+- Detección de institución por coordenadas GPS
+- Monumentos cercanos con cálculo de distancia (Haversine)
+- Tours disponibles por ubicación
+- API: `/api/location`
+
+### Versionado de Modelos 3D
+- Historial completo de versiones
+- Restaurar versiones anteriores
+- Eliminar versiones antiguas
+- Organización por carpetas en GCS
+- API: `/api/monuments/:id/model-versions`
+
+### Quiz Attempts
+- Registro de intentos con scoring automático
+- Historial de intentos por usuario
+- Estadísticas de quizzes
+- API: `/api/quizzes/:id/submit`
+
+### User Preferences
+- Preferencias de usuario para quizzes
+- API: `/api/users/:id/preferences`
+
+## 🔧 Variables de Entorno Actualizadas
+
+```env
+# Base de datos
+MONGODB_URI=mongodb://localhost:27017/historiar
+
+# JWT
+JWT_SECRET=tu_jwt_secret_muy_seguro
+
+# Google Cloud Storage
+GOOGLE_CLOUD_PROJECT_ID=tu-proyecto-gcp
+GCS_BUCKET_NAME=histori_ar
+GOOGLE_APPLICATION_CREDENTIALS=./config/gcs-key.json
+
+# Servidor
+PORT=4000
+NODE_ENV=development
+```
+
+## 📝 Estructura de Archivos en GCS
+
+### Antes (Estructura Plana)
+```
+histori_ar/
+├── models/
+│   ├── uuid1.glb
+│   ├── uuid2.glb
+│   └── uuid3.glb
+└── images/
+    ├── uuid1.jpg
+    └── uuid2.jpg
+```
+
+### Después (Estructura con Versionado)
+```
+histori_ar/
+├── models/
+│   ├── Monumento_A/
+│   │   ├── Monumento_A_2024-11-09T10-30-00.glb
+│   │   └── Monumento_A_2024-11-08T15-20-00.glb
+│   └── Monumento_B/
+│       └── Monumento_B_2024-11-09T11-00-00.glb
+└── images/
+    ├── Monumento_A/
+    │   └── Monumento_A_2024-11-09T10-30-00.jpg
+    └── Monumento_B/
+        └── Monumento_B_2024-11-09T11-00-00.jpg
+```
+
+## 🧪 Testing
+
+```bash
+# Ejecutar todos los tests
+npm test
+
+# Ejecutar tests en modo watch
+npm run test:watch
+
+# Ejecutar tests con UI
+npm run test:ui
+```
+
+## 📚 Documentación de API
+
+Para documentación completa de los endpoints, consulta:
+- `docs/API_TOURS.md` - Endpoints de tours
+- `docs/API_LOCATION.md` - Endpoints de geolocalización
+- `docs/API_VERSIONING.md` - Endpoints de versionado
+
+## 🐛 Troubleshooting
+
+### Error: "MONGODB_URI not set"
+Asegúrate de tener el archivo `.env` configurado con `MONGODB_URI`.
+
+### Error: "GCS bucket not accessible"
+Verifica que:
+1. `GOOGLE_APPLICATION_CREDENTIALS` apunte al archivo de credenciales correcto
+2. El bucket existe en GCP
+3. Las credenciales tienen permisos de lectura/escritura
+
+### Error en migraciones
+Si una migración falla:
+1. Revisa los logs para identificar el error
+2. Corrige el problema
+3. Ejecuta la migración individual nuevamente
+4. NO ejecutes `npm run migrate` completo si algunas migraciones ya se ejecutaron
+
+### Índices duplicados
+Si obtienes errores de índices duplicados:
+```bash
+# Conecta a MongoDB y elimina índices manualmente
+mongo
+use historiar
+db.tours.dropIndexes()
+db.quizattempts.dropIndexes()
+# etc...
+
+# Luego ejecuta
+npm run indexes
+```
+
+## 📄 Licencia
+
+MIT
+
+## 👥 Autor
+
+Carlos Asparrín
+
+
+## 🎨 3D Tiles Processing (Opcional)
+
+### ¿Qué son los 3D Tiles?
+
+3D Tiles es un estándar de Cesium para streaming progresivo de modelos 3D. Beneficios:
+- Carga progresiva (solo detalles visibles)
+- Mejor rendimiento para modelos grandes (>10MB)
+- Múltiples niveles de detalle (LOD)
+- Streaming eficiente
+
+### Instalación de Cesium Tools
+
+**Opción 1: Global con npm**
+```bash
+npm install -g 3d-tiles-tools
+```
+
+**Opción 2: Docker**
+```bash
+docker pull cesium/3d-tiles-tools
+```
+
+**Opción 3: Local (desarrollo)**
+```bash
+npm install 3d-tiles-tools --save-dev
+```
+
+### Verificar Instalación
+
+```bash
+3d-tiles-tools --version
+```
+
+### Uso
+
+El procesamiento de tiles se ejecuta **automáticamente** al subir un modelo 3D:
+
+- ✅ Si Cesium Tools está instalado: genera tiles automáticamente
+- ✅ Si NO está instalado: continúa sin tiles (solo GLB)
+- ✅ El sistema funciona perfectamente sin tiles
+
+### Cuándo Usar 3D Tiles
+
+✅ **Usar:**
+- Modelos grandes (>10MB)
+- Modelos muy detallados
+- Necesitas streaming progresivo
+
+❌ **NO usar:**
+- Modelos pequeños (<5MB)
+- No tienes Cesium Tools
+- Desarrollo rápido sin configuración
+
+### Documentación Completa
+
+Ver `docs/3D_TILES_SETUP.md` para:
+- Guía de instalación detallada
+- Configuración avanzada
+- Troubleshooting
+- Comparación GLB vs 3D Tiles
+- Alternativas (Cesium Ion)
+
+---
+
+## 📈 Roadmap
+
+### Completado ✅
+- [x] Sistema de Tours
+- [x] Geolocalización con Haversine
+- [x] Versionado de Modelos 3D
+- [x] Quiz Attempts
+- [x] User Preferences
+- [x] Scripts de Deployment
+- [x] 3D Tiles Processing (opcional)
+
+### En Progreso 🚧
+- [ ] Testing completo
+- [ ] Documentación de API detallada
+- [ ] Deployment a staging
+
+### Futuro 🔮
+- [ ] Mobile App (spec separado)
+- [ ] Analytics Dashboard
+- [ ] Notificaciones Push
+- [ ] Gamificación
+
+---
+
+## 🤝 Contribución
+
+Para contribuir al proyecto:
+
+1. Fork el repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+### Guías de Contribución
+
+- Seguir el estilo de código existente
+- Agregar tests para nuevas funcionalidades
+- Actualizar documentación
+- Usar commits descriptivos
+
+---
+
+## 📞 Soporte
+
+Para soporte y preguntas:
+- 📧 Email: [email del proyecto]
+- 📝 Issues: [GitHub Issues]
+- 📚 Docs: Ver carpeta `docs/`
+
+---
+
+## 🙏 Agradecimientos
+
+- Cesium por 3D Tiles specification
+- Google Cloud Platform por GCS
+- MongoDB por la base de datos
+- Comunidad open source
+
+---
+
+**Versión:** 2.0  
+**Última actualización:** Noviembre 9, 2025  
+**Estado:** Producción Ready ✅

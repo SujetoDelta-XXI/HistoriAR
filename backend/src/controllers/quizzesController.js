@@ -1,5 +1,16 @@
 import { buildPagination } from '../utils/pagination.js';
-import { getAllQuizzes, getQuizById, createQuiz, updateQuiz, deleteQuiz, evaluateQuiz } from '../services/quizService.js';
+import { 
+  getAllQuizzes, 
+  getQuizById, 
+  createQuiz, 
+  updateQuiz, 
+  deleteQuiz, 
+  evaluateQuiz,
+  submitQuizAttempt,
+  getUserAttempts,
+  getQuizAttempts,
+  getAllUserAttempts
+} from '../services/quizService.js';
 
 export async function listQuiz(req, res) {
   try {
@@ -44,4 +55,59 @@ export async function evaluateQuizController(req, res) {
     const result = await evaluateQuiz(req.params.id, answers || []);
     res.json(result);
   } catch (err) { res.status(400).json({ message: err.message }); }
+}
+
+/**
+ * Enviar intento de quiz
+ */
+export async function submitQuizAttemptController(req, res) {
+  try {
+    const userId = req.user?.sub;
+    const { answers, timeSpent } = req.body;
+    
+    if (!answers || !Array.isArray(answers)) {
+      return res.status(400).json({ message: 'Answers array is required' });
+    }
+    
+    const attempt = await submitQuizAttempt(userId, req.params.id, answers, timeSpent);
+    res.status(201).json(attempt);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+/**
+ * Obtener intentos de un quiz específico
+ */
+export async function getQuizAttemptsController(req, res) {
+  try {
+    const attempts = await getQuizAttempts(req.params.id);
+    res.json({ total: attempts.length, items: attempts });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+
+/**
+ * Obtener intentos de un usuario para un quiz
+ */
+export async function getUserQuizAttemptsController(req, res) {
+  try {
+    const attempts = await getUserAttempts(req.params.userId, req.params.quizId);
+    res.json({ total: attempts.length, items: attempts });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+
+/**
+ * Obtener todos los intentos de un usuario
+ */
+export async function getAllUserAttemptsController(req, res) {
+  try {
+    const attempts = await getAllUserAttempts(req.params.userId);
+    res.json({ total: attempts.length, items: attempts });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 }
