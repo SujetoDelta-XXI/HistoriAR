@@ -58,9 +58,11 @@ if (process.env.ALLOWED_ORIGINS) {
 
 const corsOptions = {
   origin: (origin, callback) => {
+    // Debug: log the origin to help diagnose CORS issues (visible in Vercel logs)
     // Allow requests with no origin (mobile apps, Postman, etc.)
+    console.log('CORS origin received:', origin);
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -72,6 +74,8 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
+// Ensure preflight requests are handled and CORS headers are returned for OPTIONS
+app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
