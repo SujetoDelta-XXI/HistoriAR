@@ -6,7 +6,7 @@ import { verifyGCSConnection, createFolderStructure } from './config/gcs.js';
 config();
 
 const PORT = process.env.PORT || 4000;
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
 (async () => {
   try {

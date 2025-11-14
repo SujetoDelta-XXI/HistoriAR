@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from 'dotenv';
+import { connectDB } from './config/db.js';
 
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/users.routes.js';
@@ -21,7 +22,57 @@ config();
 
 const app = express();
 
-app.use(cors());
+// Initialize MongoDB connection for Vercel serverless
+let isConnected = false;
+
+const initializeDB = async () => {
+  if (isConnected) {
+    return;
+  }
+  
+  try {
+    const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
+    await connectDB(MONGO_URI);
+    isConnected = true;
+  } catch (error) {
+    console.error('❌ MongoDB connection failed:', error.message);
+  }
+};
+
+// Initialize DB connection (for serverless)
+initializeDB();
+
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:4000',
+  // Add your Vercel admin panel URL here after deployment:
+  // 'https://your-admin-panel.vercel.app',
+];
+
+// Allow additional origins from environment variable
+if (process.env.ALLOWED_ORIGINS) {
+  allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(','));
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));

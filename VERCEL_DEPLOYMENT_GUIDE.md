@@ -18,28 +18,13 @@ Esta guía te ayudará a desplegar tanto el **Backend** como el **Admin Panel** 
 
 ### 1.1 Preparar el Backend para Vercel
 
-Crea un archivo `vercel.json` en la carpeta `backend/`:
+✅ **Ya está configurado!** Los archivos necesarios ya están creados:
 
-```json
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "src/server.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "src/server.js"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
-}
-```
+- `backend/api/index.js` - Punto de entrada serverless
+- `backend/vercel.json` - Configuración de Vercel
+- `backend/.vercelignore` - Archivos a ignorar
+
+**Nota importante:** Vercel usa **serverless functions**, por lo que no se usa `app.listen()`. La conexión a MongoDB se inicializa automáticamente en cada request.
 
 ### 1.2 Variables de Entorno del Backend
 
@@ -155,18 +140,10 @@ curl https://tu-backend.vercel.app/api/health
 
 ### 2.1 Preparar el Admin Panel
 
-Crea un archivo `vercel.json` en la carpeta `admin-panel/`:
+✅ **Ya está configurado!** Los archivos necesarios ya están creados:
 
-```json
-{
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
-}
-```
+- `admin-panel/vercel.json` - Configuración de Vercel para SPA
+- `admin-panel/.vercelignore` - Archivos a ignorar
 
 ### 2.2 Variables de Entorno del Admin Panel
 
