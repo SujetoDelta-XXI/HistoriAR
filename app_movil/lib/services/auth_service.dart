@@ -1,15 +1,25 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  static const String _baseUrl =
-      'http://localhost:4000/api/auth';
+  static const String _baseUrl = 'http://192.168.81.40:4000/api/auth';
+
+  // Usuario de desarrollo
+  static const String _devEmail = 'dev@historiar.test';
+  static const String _devPassword = '123456';
+  static const String _devToken = 'DEV_TOKEN';
 
   Future<String> login({
     required String email,
     required String password,
   }) async {
+    // Login de desarrollo sin API (solo en modo debug)
+    if (kDebugMode && email == _devEmail && password == _devPassword) {
+      return _devToken;
+    }
+
     final uri = Uri.parse('$_baseUrl/login');
 
     final response = await http.post(

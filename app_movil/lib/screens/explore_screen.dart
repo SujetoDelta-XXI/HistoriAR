@@ -1,7 +1,63 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-class ExploreScreen extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+
+class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
+
+  @override
+  State<ExploreScreen> createState() => _ExploreScreenState();
+}
+
+class _ExploreScreenState extends State<ExploreScreen> {
+  final MapController _mapController = MapController();
+
+  static const LatLng _initialCenter = LatLng(-12.046374, -77.042793);
+  double _zoom = 14;
+  LatLng? _currentLatLng;
+  double _heading = 0;
+  StreamSubscription<Position>? _positionSub;
+
+  Future<void> _startLocationUpdates() async {
+    final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    if (permission == LocationPermission.deniedForever) return;
+
+    await _positionSub?.cancel();
+
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.best,
+      distanceFilter: 1,
+    );
+
+    _positionSub = Geolocator.getPositionStream(locationSettings: locationSettings)
+        .listen((Position pos) {
+      final LatLng latLng = LatLng(pos.latitude, pos.longitude);
+
+      setState(() {
+        _currentLatLng = latLng;
+        _heading = pos.heading; // puede ser -1 si no disponible
+        _zoom = 16;
+        _mapController.move(latLng, _zoom);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,40 +124,59 @@ class ExploreScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 12),
-
-            // Zona principal (mapa “placeholder”)
+            // Zona principal (mapa)
             Expanded(
               child: Stack(
                 children: [
-                  // Fondo del mapa
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 0),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2F9E6),
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _initialCenter,
+                      initialZoom: _zoom,
                     ),
-                  ),
-
-                  // Cuadrícula ligera (solo para parecer mapa)
-                  CustomPaint(
-                    size: Size.infinite,
-                    painter: _GridPainter(),
-                  ),
-
-                  // Ejemplo de marcadores
-                  Positioned(
-                    right: 40,
-                    top: 80,
-                    child: _MarkerChip(distance: '5200m', color: Colors.grey),
-                  ),
-                  Positioned(
-                    left: 60,
-                    bottom: 140,
-                    child: _MarkerCluster(),
-                  ),
-                  Positioned(
-                    right: 24,
-                    bottom: 180,
-                    child: _MarkerChip(distance: '850m', color: Colors.green),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.historiar',
+                      ),
+                      if (_currentLatLng != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _currentLatLng!,
+                              width: 40,
+                              height: 40,
+                              alignment: Alignment.center,
+                              child: Transform.rotate(
+                                angle: _heading * 3.1415926535 / 180,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.8),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.navigation,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
 
                   // Botones + / - en la parte superior derecha
@@ -112,18 +187,28 @@ class ExploreScreen extends StatelessWidget {
                       children: [
                         _SquareIconButton(
                           icon: Icons.add,
-                          onTap: () {},
+                          onTap: () {
+                            setState(() {
+                              _zoom += 1;
+                              _mapController.move(_initialCenter, _zoom);
+                            });
+                          },
                         ),
                         const SizedBox(height: 8),
                         _SquareIconButton(
                           icon: Icons.remove,
-                          onTap: () {},
+                          onTap: () {
+                            setState(() {
+                              _zoom -= 1;
+                              _mapController.move(_initialCenter, _zoom);
+                            });
+                          },
                         ),
                       ],
                     ),
                   ),
 
-                  // Botones de buscar / capas en top-right (pero un poco más arriba)
+                  // Botones de buscar / capas en top-right (mantener por ahora sin lógica)
                   Positioned(
                     top: 20,
                     right: 20,
@@ -149,7 +234,9 @@ class ExploreScreen extends StatelessWidget {
                     child: FloatingActionButton(
                       backgroundColor: Colors.white,
                       elevation: 4,
-                      onPressed: () {},
+                      onPressed: () {
+                        _startLocationUpdates();
+                      },
                       child: const Icon(
                         Icons.navigation_rounded,
                         color: Colors.orange,
