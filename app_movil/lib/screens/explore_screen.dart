@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/monument.dart';
 import '../screens/ar_camera_screen.dart';
+import '../screens/quiz_screen.dart'; // Importing QuizScreen for navigation to quiz
 import '../services/monuments_service.dart';
 import '../contexts/auth_state.dart';
 
@@ -289,6 +290,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ],
                   ),
 
+
                   // Indicadores de carga / error
                   if (_isLoadingMonuments)
                     const Positioned(
@@ -399,31 +401,125 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             _selectedMonument = null;
                           });
                         },
-                        onViewAr: () {
-                          if (_selectedMonument == null) return;
+              onViewAr: () async {
+                if (_selectedMonument == null) return;
 
-                          // Verificamos que haya un token válido antes de ir a RA
-                          final token = authState.token;
-                          if (token == null || token.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Sesión inválida o expirada. Vuelve a iniciar sesión.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
+                // Verificamos que haya un token válido antes de ir a RA
+                final token = authState.token;
+                if (token == null || token.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Sesión inválida o expirada. Vuelve a iniciar sesión.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
 
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ArCameraScreen(
-                                monument: _selectedMonument!,
-                                token: token,
+                // 1) Ir a la cámara AR y esperar a que el usuario salga
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ArCameraScreen(
+                      monument: _selectedMonument!,
+                      token: token,
+                    ),
+                  ),
+                );
+
+                if (!mounted) return;
+
+                // 2) Al volver, mostrar el modal para invitar al quiz
+                final shouldGoToQuiz = await showModalBottomSheet<bool>(
+                  context: context,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  builder: (context) {
+                    final monument = _selectedMonument!;
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade300,
+                                borderRadius: BorderRadius.circular(999),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            '¿Listo para poner a prueba lo que aprendiste?',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Responde un quiz sobre ${monument.name} y gana puntos.',
+                            style: const TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: Colors.grey.shade300),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text('Ahora no'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFFF6600),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Realizar Quiz',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+
+                // 3) Si acepta, ir al Quiz
+                if (shouldGoToQuiz == true && mounted) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => QuizScreen(
+                        monument: _selectedMonument!,
+                        token: token,
+                      ),
+                    ),
+                  );
+                }
+              },
                       ),
                     ),
                 ],
