@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/monument.dart';
 import '../screens/ar_camera_screen.dart';
 import '../services/monuments_service.dart';
+import '../contexts/auth_state.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -400,9 +401,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         },
                         onViewAr: () {
                           if (_selectedMonument == null) return;
+
+                          // Verificamos que haya un token válido antes de ir a RA
+                          final token = authState.token;
+                          if (token == null || token.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Sesión inválida o expirada. Vuelve a iniciar sesión.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => ArCameraScreen(monument: _selectedMonument!),
+                              builder: (_) => ArCameraScreen(
+                                monument: _selectedMonument!,
+                                token: token,
+                              ),
                             ),
                           );
                         },

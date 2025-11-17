@@ -62,7 +62,8 @@ export async function evaluateQuizController(req, res) {
  */
 export async function submitQuizAttemptController(req, res) {
   try {
-    const userId = req.user?.sub;
+    // El middleware verifyToken normaliza el usuario como req.user.id
+    const userId = req.user?.id;
     const { answers, timeSpent } = req.body;
     
     if (!answers || !Array.isArray(answers)) {

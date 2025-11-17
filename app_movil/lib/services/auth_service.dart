@@ -1,26 +1,15 @@
 import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'api_config.dart';
 
 class AuthService {
-  static const String _baseUrl = 'http://localhost:4000/api/auth';
-
-  // Usuario de desarrollo
-  static const String _devEmail = 'dev@historiar.test';
-  static const String _devPassword = '123456';
-  static const String _devToken = 'DEV_TOKEN';
+  static const String _basePath = '/api/auth';
 
   Future<String> login({
     required String email,
     required String password,
   }) async {
-    // Login de desarrollo sin API (solo en modo debug)
-    if (kDebugMode && email == _devEmail && password == _devPassword) {
-      return _devToken;
-    }
-
-    final uri = Uri.parse('$_baseUrl/login');
+    final uri = Uri.parse('$apiBaseUrl$_basePath/login');
 
     final response = await http.post(
       uri,
@@ -47,12 +36,39 @@ class AuthService {
     }
   }
 
+  /// Valida un token existente contra /api/auth/validate.
+  /// Si es válido, devuelve true; si no, lanza una excepción.
+  Future<bool> validateToken(String token) async {
+    final uri = Uri.parse('$apiBaseUrl$_basePath/validate');
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return true;
+    } else {
+      String message = 'Token inválido';
+      try {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['message'] is String) {
+          message = data['message'] as String;
+        }
+      } catch (_) {}
+      throw Exception(message);
+    }
+  }
+
   Future<void> register({
     required String name,
     required String email,
     required String password,
   }) async {
-    final uri = Uri.parse('$_baseUrl/register');
+    final uri = Uri.parse('$apiBaseUrl$_basePath/register');
 
     final response = await http.post(
       uri,

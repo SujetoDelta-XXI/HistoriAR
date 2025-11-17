@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../contexts/auth_state.dart';
 import '../services/auth_service.dart';
 import 'main_scaffold.dart';
 
@@ -67,7 +68,8 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _isLoading = true);
     try {
-      await _authService.login(email: email, password: password);
+      final token = await _authService.login(email: email, password: password);
+      authState.token = token;
       _goToApp();
     } catch (e) {
       _showError(e.toString().replaceFirst('Exception: ', ''));

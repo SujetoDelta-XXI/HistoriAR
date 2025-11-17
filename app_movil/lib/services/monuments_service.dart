@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/monument.dart';
+import 'api_config.dart';
 
 /// Servicio responsable de obtener monumentos desde la API.
 class MonumentsService {
@@ -10,11 +11,8 @@ class MonumentsService {
 
   final http.Client _client;
 
-  /// Base URL del backend. En un futuro podría venir desde configuración.
-  final String baseUrl = 'http://localhost:4000';
-
   Future<List<Monument>> fetchMonuments() async {
-    final uri = Uri.parse('$baseUrl/api/monuments');
+    final uri = Uri.parse('$apiBaseUrl/api/monuments');
     final response = await _client.get(uri);
 
     if (response.statusCode != 200) {
