@@ -40,6 +40,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void initState() {
     super.initState();
     _loadMonuments();
+    // Pedir ubicación y comenzar a seguir al usuario al cargar la pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startLocationUpdates();
+    });
   }
 
   Future<void> _loadMonuments() async {
@@ -143,34 +147,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
       markers.add(
         Marker(
           point: _currentLatLng!,
-          width: 40,
-          height: 40,
+          width: 50,
+          height: 50,
           alignment: Alignment.center,
-          child: Transform.rotate(
-            angle: _heading * math.pi / 180,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.8),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.navigation,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ],
-            ),
-          ),
+          child: const _UserLocationMarker(),
         ),
       );
     }
@@ -182,9 +162,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
       markers.add(
         Marker(
           point: m.position,
-          width: 70,
-          height: 70,
+          width: 68,
+          height: 68,
           alignment: Alignment.center,
+          rotate: false,
           child: GestureDetector(
             onTap: () {
               setState(() {
@@ -195,10 +176,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
               name: m.name,
               distanceText:
                   visual.distanceMeters != null ? '${visual.distanceMeters!.round()}m' : '--',
-              backgroundColor: visual.backgroundColor,
-              iconData: visual.icon,
-              showCheck: visual.showCheck,
-              locked: visual.locked,
+              imageUrl: m.imageUrl,
+              statusIcon: visual.statusIcon,
             ),
           ),
         ),
@@ -276,6 +255,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     options: MapOptions(
                       initialCenter: _initialCenter,
                       initialZoom: _zoom,
+                      minZoom: 17,
+                      maxZoom: 18,
                     ),
                     children: [
                       TileLayer(
@@ -539,6 +520,7 @@ class _MarkerVisualState {
   final bool locked;
   final bool showCheck;
   final double? distanceMeters;
+  final IconData statusIcon;
 
   _MarkerVisualState({
     required this.backgroundColor,
@@ -546,6 +528,7 @@ class _MarkerVisualState {
     required this.locked,
     required this.showCheck,
     required this.distanceMeters,
+    required this.statusIcon,
   });
 
   factory _MarkerVisualState.disponible(double? distanceMeters) {
@@ -555,6 +538,7 @@ class _MarkerVisualState {
       locked: false,
       showCheck: true,
       distanceMeters: distanceMeters,
+      statusIcon: Icons.play_circle_fill,
     );
     // se muestra como la burbuja verde con check
   }
@@ -566,6 +550,7 @@ class _MarkerVisualState {
       locked: true,
       showCheck: false,
       distanceMeters: distanceMeters,
+      statusIcon: Icons.location_off,
     );
   }
 
@@ -576,6 +561,7 @@ class _MarkerVisualState {
       locked: false,
       showCheck: false,
       distanceMeters: distanceMeters,
+      statusIcon: Icons.verified,
     );
   }
 
@@ -586,60 +572,55 @@ class _MarkerVisualState {
       locked: true,
       showCheck: false,
       distanceMeters: distanceMeters,
+      statusIcon: Icons.visibility_off,
     );
   }
 }
 
-/// Marcador tipo chip como en la imagen
 class _MonumentMarker extends StatelessWidget {
   final String name;
   final String distanceText;
-  final Color backgroundColor;
-  final IconData iconData;
-  final bool locked;
-  final bool showCheck;
+  final String? imageUrl;
+  final IconData statusIcon;
 
   const _MonumentMarker({
     required this.name,
     required this.distanceText,
-    required this.backgroundColor,
-    required this.iconData,
-    required this.locked,
-    required this.showCheck,
+    required this.imageUrl,
+    required this.statusIcon,
   });
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       clipBehavior: Clip.none,
+      alignment: Alignment.center,
       children: [
-        // Círculo principal
+        // Círculo principal con imagen del monumento
         Container(
           width: 40,
           height: 40,
-          decoration: BoxDecoration(
-            color: backgroundColor,
+          decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            color: Colors.grey,
           ),
-          alignment: Alignment.center,
-          child: Icon(
-            iconData,
-            color: Colors.white,
-            size: 22,
-          ),
+          clipBehavior: Clip.antiAlias,
+          child: imageUrl != null && imageUrl!.isNotEmpty
+              ? Image.network(
+                  imageUrl!,
+                  fit: BoxFit.cover,
+                )
+              : const Icon(
+                  Icons.location_city,
+                  color: Colors.white,
+                  size: 24,
+                ),
         ),
-        // Etiqueta con distancia arriba
+        // Nombre arriba
         Positioned(
-          top: -22,
-          left: -8,
-          right: -8,
+          top: -20,
+          left: -20,
+          right: -20,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -653,53 +634,155 @@ class _MonumentMarker extends StatelessWidget {
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  distanceText,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            child: Text(
+              name,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
-        // Check verde abajo a la derecha (opcional)
-        if (showCheck)
-          Positioned(
-            bottom: -4,
-            right: -4,
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.check,
-                size: 14,
-                color: Colors.green,
+        // Distancia abajo
+        Positioned(
+          bottom: -18,
+          left: -18,
+          right: -18,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text(
+              distanceText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
+        ),
+        // Círculo pequeño con símbolo de estado
+        Positioned(
+          bottom: -4,
+          right: -4,
+          child: Container(
+            width: 18,
+            height: 18,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              statusIcon,
+              size: 14,
+              color: Colors.black87,
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _UserLocationMarker extends StatefulWidget {
+  const _UserLocationMarker();
+
+  @override
+  State<_UserLocationMarker> createState() => _UserLocationMarkerState();
+}
+
+class _UserLocationMarkerState extends State<_UserLocationMarker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    _pulseAnimation = Tween<double>(begin: 0.7, end: 1.3).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scale = _pulseAnimation.value;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.blue.withOpacity(0.18),
+                ),
+              ),
+            ),
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.45),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.white,
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.navigation_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
