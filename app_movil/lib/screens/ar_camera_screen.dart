@@ -38,6 +38,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
 
   bool _isLoadingModel = false;
   String? _loadError;
+  String? _lastPressedButtonId;
 
   @override
   void dispose() {
@@ -56,7 +57,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
 
     this.arSessionManager!.onInitialize(
       showFeaturePoints: false,
-      showPlanes: false,
+      showPlanes: true,
       customPlaneTexturePath: "Images/triangle.png",
       showWorldOrigin: false,
       handleTaps: false,
@@ -88,7 +89,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
 
     // Colocamos el modelo ligeramente por debajo del centro de la cámara
     final transform = vmath.Matrix4.identity()
-      ..setTranslationRaw(0.0, -0.2, -1.0)
+      ..setTranslationRaw(0.0, -0.5, -1.0)
       ..rotateY(_rotationY)
       ..scale(_scaleFactor);
 
@@ -168,6 +169,16 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
     _updateNodeTransform();
   }
 
+  void _flashButton(String id) {
+    setState(() => _lastPressedButtonId = id);
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      if (_lastPressedButtonId == id) {
+        setState(() => _lastPressedButtonId = null);
+      }
+    });
+  }
+
   void _resetTransform() {
     if (webObjectNode == null) return;
     setState(() {
@@ -210,7 +221,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
             },
             child: ARView(
               onARViewCreated: onARViewCreated,
-              planeDetectionConfig: PlaneDetectionConfig.none,
+              planeDetectionConfig: PlaneDetectionConfig.horizontal,
             ),
           ),
           if (_isLoadingModel)
@@ -401,31 +412,51 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
                           children: [
                             _ArControlButton(
                               icon: Icons.rotate_left,
-                              onPressed: _rotateRight,
+                              onPressed: () {
+                                _flashButton('rotate_left');
+                                _rotateRight();
+                              },
+                              isHighlighted: _lastPressedButtonId == 'rotate_left',
                             ),
                             const SizedBox(width: 12),
                             _ArControlButton(
                               icon: Icons.zoom_out,
-                              onPressed: _zoomOut,
+                              onPressed: () {
+                                _flashButton('zoom_out');
+                                _zoomOut();
+                              },
+                              isHighlighted: _lastPressedButtonId == 'zoom_out',
                             ),
                             const SizedBox(width: 12),
                             _ArControlButton(
                               icon: Icons.restart_alt,
                               // Centra el modelo nuevamente frente a la cámara
                               onPressed: webObjectNode != null
-                                  ? _resetTransform
+                                  ? () {
+                                      _flashButton('reset');
+                                      _resetTransform();
+                                    }
                                   : null,
                               isPrimary: true,
+                              isHighlighted: _lastPressedButtonId == 'reset',
                             ),
                             const SizedBox(width: 12),
                             _ArControlButton(
                               icon: Icons.zoom_in,
-                              onPressed: _zoomIn,
+                              onPressed: () {
+                                _flashButton('zoom_in');
+                                _zoomIn();
+                              },
+                              isHighlighted: _lastPressedButtonId == 'zoom_in',
                             ),
                             const SizedBox(width: 12),
                             _ArControlButton(
                               icon: Icons.rotate_right,
-                              onPressed: _rotateRight,
+                              onPressed: () {
+                                _flashButton('rotate_right');
+                                _rotateRight();
+                              },
+                              isHighlighted: _lastPressedButtonId == 'rotate_right',
                             ),
                           ],
                         ),
@@ -536,27 +567,35 @@ class _ArControlButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
   final bool isPrimary;
+  final bool isHighlighted;
 
   const _ArControlButton({
     required this.icon,
     required this.onPressed,
     this.isPrimary = false,
+    this.isHighlighted = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool enabled = onPressed != null;
-    final Color bg = isPrimary
+    final Color baseBg = isPrimary
         ? (enabled ? Colors.white : Colors.white.withOpacity(0.4))
         : (enabled
             ? const Color(0xFFFF6600)
             : const Color(0xFFFF6600).withOpacity(0.4));
-    final Color fg = isPrimary ? Colors.black : Colors.white;
+
+    final Color bg = isHighlighted
+        ? Colors.white.withOpacity(0.9)
+        : baseBg;
+
+    final Color fg = isPrimary || isHighlighted ? Colors.black : Colors.white;
 
     return InkWell(
       onTap: enabled ? onPressed : null,
       borderRadius: BorderRadius.circular(999),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
         width: 52,
         height: 52,
         decoration: BoxDecoration(
