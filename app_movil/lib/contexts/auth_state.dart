@@ -1,7 +1,7 @@
 class AuthState {
-  String? token;
+  String token = '';
 
-  bool get isLoggedIn => token != null;
+  bool get isLoggedIn => token.isNotEmpty;
 }
 
 // Estado global simple para autenticación.

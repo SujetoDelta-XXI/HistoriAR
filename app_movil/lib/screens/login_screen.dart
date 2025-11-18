@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen>
   void _goToApp() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => const MainScaffold(),
+        builder: (_) => MainScaffold(token: authState.token),
       ),
     );
   }

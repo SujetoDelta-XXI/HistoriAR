@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
 import 'explore_screen.dart';
+import 'my_tour_screen.dart';
+import 'profile_screen.dart';
+import 'configuration_screen.dart';
 
 class MainScaffold extends StatefulWidget {
-  const MainScaffold({super.key});
+  final String token;        // <- token que viene del login
+
+  const MainScaffold({
+    super.key,
+    required this.token,
+  });
 
   @override
   State<MainScaffold> createState() => _MainScaffoldState();
@@ -12,12 +19,18 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    ExploreScreen(),   // 0
-    HomeScreen(),      // 1 (usamos Home como “Mi tour” por ahora)
-    Placeholder(),     // 2 Perfil
-    Placeholder(),     // 3 Configuración
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      const ExploreScreen(),                    // 0
+      const MyTourScreen(),                      // 1 usa el token real
+      const ProfileScreen(),                      // 2 Perfil
+      const ConfigurationScreen(),                      // 3 Configuración
+    ];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
