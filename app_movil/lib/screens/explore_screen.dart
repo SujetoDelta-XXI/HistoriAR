@@ -257,6 +257,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       initialZoom: _zoom,
                       minZoom: 17,
                       maxZoom: 18,
+                      interactionOptions: const InteractionOptions(
+                        enableMultiFingerGestureRace: false,
+                        flags: InteractiveFlag.none,
+                      ),
                     ),
                     children: [
                       TileLayer(
@@ -312,7 +316,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           onTap: () {
                             setState(() {
                               _zoom += 1;
-                              _mapController.move(_initialCenter, _zoom);
+                              final center = _currentLatLng ?? _initialCenter;
+                              _mapController.move(center, _zoom);
                             });
                           },
                         ),
@@ -322,7 +327,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           onTap: () {
                             setState(() {
                               _zoom -= 1;
-                              _mapController.move(_initialCenter, _zoom);
+                              final center = _currentLatLng ?? _initialCenter;
+                              _mapController.move(center, _zoom);
                             });
                           },
                         ),

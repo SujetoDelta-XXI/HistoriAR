@@ -221,6 +221,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
             },
             child: ARView(
               onARViewCreated: onARViewCreated,
+              // Habilitamos la detección de planos horizontales
               planeDetectionConfig: PlaneDetectionConfig.horizontal,
             ),
           ),
