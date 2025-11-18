@@ -139,7 +139,7 @@ class _MyTourScreenState extends State<MyTourScreen> {
             Text(
               value,
               style: theme.textTheme.titleLarge?.copyWith(
-                color: Colors.deepOrange,
+                color: const Color(0xFFFF6600),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -161,8 +161,13 @@ class _MyTourScreenState extends State<MyTourScreen> {
         TextField(
           decoration: InputDecoration(
             hintText: 'Buscar en tu tour…',
-            prefixIcon: const Icon(Icons.search),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            prefixIcon: const Icon(Icons.search, color: Color(0xFFFF6600)),
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
             isDense: true,
           ),
           onChanged: (value) => setState(() {
@@ -198,8 +203,10 @@ class _MyTourScreenState extends State<MyTourScreen> {
                 decoration: InputDecoration(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  border:
-                      OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
                 ),
               ),
             ),
@@ -207,7 +214,7 @@ class _MyTourScreenState extends State<MyTourScreen> {
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.dividerColor),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -242,7 +249,7 @@ class _MyTourScreenState extends State<MyTourScreen> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isActive ? Colors.deepOrange : Colors.transparent,
+          color: isActive ? const Color(0xFFFF6600) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
@@ -328,7 +335,7 @@ class _MyTourScreenState extends State<MyTourScreen> {
                   label: monument.category.isNotEmpty
                       ? monument.category
                       : 'Huaca Arqueológica',
-                  backgroundColor: Colors.deepOrange,
+                  backgroundColor: const Color(0xFFFF6600),
                 ),
               ),
               Positioned(
@@ -337,7 +344,7 @@ class _MyTourScreenState extends State<MyTourScreen> {
                 child: _buildChip(
                   label:
                       monument.rarity.isNotEmpty ? monument.rarity : 'legendary',
-                  backgroundColor: Colors.orange[700]!,
+                  backgroundColor: const Color(0xFFFF6600),
                 ),
               ),
               Positioned(
@@ -374,7 +381,7 @@ class _MyTourScreenState extends State<MyTourScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.green[600],
+                    color: const Color(0xFF00A65A),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -448,7 +455,7 @@ class _MyTourScreenState extends State<MyTourScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () {},
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepOrange,
+                          backgroundColor: const Color(0xFFFF6600),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
@@ -465,14 +472,18 @@ class _MyTourScreenState extends State<MyTourScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () {},
                         style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFFF6600)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
                           padding:
                               const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        icon: const Icon(Icons.replay),
-                        label: const Text('Repetir'),
+                        icon: const Icon(Icons.replay, color: Color(0xFFFF6600)),
+                        label: const Text(
+                          'Repetir',
+                          style: TextStyle(color: Color(0xFFFF6600)),
+                        ),
                       ),
                     ),
                   ],

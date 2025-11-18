@@ -32,8 +32,12 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
   double _rotationY = 0.0; // en radianes
   double _baseScale = 0.2;
   double _baseRotationY = 0.0;
-  vmath.Vector2 _offset = vmath.Vector2(0.0, 0.0);
+  // Offset inicial: un poco más abajo del centro de la cámara
+  vmath.Vector2 _offset = vmath.Vector2(0.0, -0.2);
   vmath.Vector2 _baseOffset = vmath.Vector2(0.0, 0.0);
+
+  bool _isLoadingModel = false;
+  String? _loadError;
 
   @override
   void dispose() {
@@ -52,7 +56,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
 
     this.arSessionManager!.onInitialize(
       showFeaturePoints: false,
-      showPlanes: true,
+      showPlanes: false,
       customPlaneTexturePath: "Images/triangle.png",
       showWorldOrigin: false,
       handleTaps: false,
@@ -66,16 +70,25 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
     final url = widget.monument.model3DUrl;
     if (url == null || url.isEmpty) {
       stdout.writeln('Monumento sin model3DUrl');
+      setState(() {
+        _loadError = 'No se encontró modelo 3D para este monumento.';
+      });
       return;
     }
+
+    setState(() {
+      _isLoadingModel = true;
+      _loadError = null;
+    });
 
     if (webObjectNode != null) {
       await arObjectManager?.removeNode(webObjectNode!);
       webObjectNode = null;
     }
 
+    // Colocamos el modelo ligeramente por debajo del centro de la cámara
     final transform = vmath.Matrix4.identity()
-      ..setTranslationRaw(0.0, 0.0, -1.0)
+      ..setTranslationRaw(0.0, -0.2, -1.0)
       ..rotateY(_rotationY)
       ..scale(_scaleFactor);
 
@@ -85,9 +98,38 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
       transformation: transform,
     );
 
-    final didAdd = await arObjectManager?.addNode(newNode);
-    if (didAdd == true) {
-      webObjectNode = newNode;
+    try {
+      final didAdd = await arObjectManager?.addNode(newNode);
+      if (didAdd == true) {
+        setState(() {
+          webObjectNode = newNode;
+        });
+      } else {
+        setState(() {
+          _loadError = 'No se pudo cargar el modelo 3D.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _loadError = 'Error al cargar el modelo: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingModel = false;
+        });
+        // Ocultar el mensaje de error automáticamente después de unos segundos
+        if (_loadError != null) {
+          Future.delayed(const Duration(seconds: 4), () {
+            if (!mounted) return;
+            if (_loadError != null) {
+              setState(() {
+                _loadError = null;
+              });
+            }
+          });
+        }
+      }
     }
   }
 
@@ -131,7 +173,8 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
     setState(() {
       _scaleFactor = 0.2;
       _rotationY = 0.0;
-      _offset = vmath.Vector2(0.0, 0.0);
+      // Reseteamos el offset manteniendo el modelo un poco más abajo
+      _offset = vmath.Vector2(0.0, -0.25);
     });
     _updateNodeTransform();
   }
@@ -167,10 +210,109 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
             },
             child: ARView(
               onARViewCreated: onARViewCreated,
-              planeDetectionConfig:
-                  PlaneDetectionConfig.horizontalAndVertical,
+              planeDetectionConfig: PlaneDetectionConfig.none,
             ),
           ),
+          if (_isLoadingModel)
+            Align(
+              alignment: Alignment.topCenter,
+              child: SafeArea(
+                child: Container(
+                  // Lo bajamos un poco para no tapar el nombre del monumento
+                  margin: const EdgeInsets.only(top: 72),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'Preparando experiencia AR...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Mueve el dispositivo lentamente hasta que desaparezca la guía.',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (_loadError != null && !_isLoadingModel)
+            Align(
+              alignment: Alignment.topCenter,
+              child: SafeArea(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _loadError = null;
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _loadError!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -207,6 +349,11 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  _ArControlButton(
+                    icon: Icons.info_outline,
+                    onPressed: () => _showMonumentInfo(context),
+                  ),
                 ],
               ),
             ),
@@ -236,45 +383,54 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(26),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _ArControlButton(
-                          icon: Icons.rotate_left,
-                          onPressed: _rotateRight,
+                  Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
                         ),
-                        const SizedBox(width: 12),
-                        _ArControlButton(
-                          icon: Icons.zoom_out,
-                          onPressed: _zoomOut,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(26),
                         ),
-                        const SizedBox(width: 12),
-                        _ArControlButton(
-                          icon: Icons.restart_alt,
-                          onPressed: _resetTransform,
-                          isPrimary: true,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _ArControlButton(
+                              icon: Icons.rotate_left,
+                              onPressed: _rotateRight,
+                            ),
+                            const SizedBox(width: 12),
+                            _ArControlButton(
+                              icon: Icons.zoom_out,
+                              onPressed: _zoomOut,
+                            ),
+                            const SizedBox(width: 12),
+                            _ArControlButton(
+                              icon: Icons.restart_alt,
+                              // Centra el modelo nuevamente frente a la cámara
+                              onPressed: webObjectNode != null
+                                  ? _resetTransform
+                                  : null,
+                              isPrimary: true,
+                            ),
+                            const SizedBox(width: 12),
+                            _ArControlButton(
+                              icon: Icons.zoom_in,
+                              onPressed: _zoomIn,
+                            ),
+                            const SizedBox(width: 12),
+                            _ArControlButton(
+                              icon: Icons.rotate_right,
+                              onPressed: _rotateRight,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        _ArControlButton(
-                          icon: Icons.zoom_in,
-                          onPressed: _zoomIn,
-                        ),
-                        const SizedBox(width: 12),
-                        _ArControlButton(
-                          icon: Icons.rotate_right,
-                          onPressed: _rotateRight,
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -288,11 +444,97 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
   Future<void> _onBackPressed() async {
     Navigator.of(context).pop();
   }
+
+  void _showMonumentInfo(BuildContext context) {
+    final monument = widget.monument;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding
+(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      monument.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _InfoItem(
+                      label: 'Estado',
+                      value: monument.status,
+                    ),
+                  ),
+                  Expanded(
+                    child: _InfoItem(
+                      label: 'Distrito',
+                      value: (monument.district ?? '').isNotEmpty
+                          ? monument.district!
+                          : '—',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _InfoItem(
+                      label: 'Latitud',
+                      value: monument.position.latitude.toStringAsFixed(5),
+                    ),
+                  ),
+                  Expanded(
+                    child: _InfoItem(
+                      label: 'Longitud',
+                      value: monument.position.longitude.toStringAsFixed(5),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                monument.description,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _ArControlButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isPrimary;
 
   const _ArControlButton({
@@ -303,12 +545,16 @@ class _ArControlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bg = isPrimary ? Colors.white : const Color(0xFFFF6600);
+    final bool enabled = onPressed != null;
+    final Color bg = isPrimary
+        ? (enabled ? Colors.white : Colors.white.withOpacity(0.4))
+        : (enabled
+            ? const Color(0xFFFF6600)
+            : const Color(0xFFFF6600).withOpacity(0.4));
     final Color fg = isPrimary ? Colors.black : Colors.white;
 
-    return InkWell
-(
-      onTap: onPressed,
+    return InkWell(
+      onTap: enabled ? onPressed : null,
       borderRadius: BorderRadius.circular(999),
       child: Container(
         width: 52,
@@ -318,6 +564,41 @@ class _ArControlButton extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: fg, size: 24),
+      ),
+    );
+  }
+}
+
+class _InfoItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
