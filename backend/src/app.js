@@ -11,7 +11,7 @@ import monumentRoutes from './routes/monuments.routes.js';
 import categoryRoutes from './routes/categories.routes.js';
 import historicalDataRoutes from './routes/historicalData.routes.js';
 import visitRoutes from './routes/visits.routes.js';
-import quizRoutes from './quizzes.routes.js';
+import quizRoutes from './routes/quizzes.routes.js';   // ✔ corregido
 import uploadRoutes from './routes/uploads.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import tourRoutes from './routes/tours.routes.js';
@@ -21,24 +21,21 @@ config();
 
 const app = express();
 
-// =========================
-// 🔥 CORS CONFIG
-// =========================
-const allowedOrigin = "http://deploy-historiar-admin.s3-website-us-west-1.amazonaws.com";
-
+// =======================
+// 🔥 CORS CORRECTO
+// =======================
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: "http://deploy-historiar-admin.s3-website-us-west-1.amazonaws.com",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
 
-// Para responder preflight OPTIONS a cualquier ruta
 app.options("*", cors());
 
-// =========================
+// =======================
 
 app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
