@@ -7,6 +7,8 @@ export async function connectDB(uri) {
     console.log('✅ MongoDB Atlas conectado');
   } catch (err) {
     console.error('❌ Error conectando a MongoDB:', err.message);
-    process.exit(1);
+    // In serverless environments (like Vercel) calling process.exit will kill the runtime.
+    // Re-throw the error so callers can handle it gracefully instead of exiting the process.
+    throw err;
   }
 }
