@@ -134,7 +134,7 @@ export async function updateMonumentController(req, res) {
 export async function deleteMonumentController(req, res) {
   const doc = await deleteMonument(req.params.id);
   if (!doc) return res.status(404).json({ message: 'No encontrado' });
-  res.json({ message: 'Marcado como Borrado' });
+  res.json({ message: 'Monumento eliminado', id: doc._id });
 }
 
 export async function searchMonumentsController(req, res) {
