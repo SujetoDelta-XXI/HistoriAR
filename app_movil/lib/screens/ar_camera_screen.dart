@@ -33,7 +33,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
   double _baseScale = 0.2;
   double _baseRotationY = 0.0;
   // Offset inicial: un poco más abajo del centro de la cámara
-  vmath.Vector2 _offset = vmath.Vector2(0.0, -0.2);
+  vmath.Vector2 _offset = vmath.Vector2(0.0, -0.3);
   vmath.Vector2 _baseOffset = vmath.Vector2(0.0, 0.0);
 
   bool _isLoadingModel = false;
@@ -56,7 +56,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
     this.arObjectManager = arObjectManager;
 
     this.arSessionManager!.onInitialize(
-      showFeaturePoints: false,
+      showFeaturePoints: true,
       showPlanes: true,
       customPlaneTexturePath: "Images/triangle.png",
       showWorldOrigin: false,
@@ -87,9 +87,9 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
       webObjectNode = null;
     }
 
-    // Colocamos el modelo ligeramente por debajo del centro de la cámara
+    // Colocamos el modelo al frente y un poco más abajo de la cámara
     final transform = vmath.Matrix4.identity()
-      ..setTranslationRaw(0.0, -0.5, -1.0)
+      ..setTranslationRaw(0.0, -0.4, -0.8)
       ..rotateY(_rotationY)
       ..scale(_scaleFactor);
 
@@ -138,7 +138,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
     if (webObjectNode == null) return;
 
     final transform = vmath.Matrix4.identity()
-      ..setTranslationRaw(_offset.x, _offset.y, -1.0)
+      ..setTranslationRaw(_offset.x, _offset.y, -0.8)
       ..rotateY(_rotationY)
       ..scale(_scaleFactor);
 
@@ -148,7 +148,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
   void _zoomIn() {
     if (webObjectNode == null) return;
     setState(() {
-      _scaleFactor = (_scaleFactor + 0.05).clamp(0.05, 1.0);
+      _scaleFactor = (_scaleFactor + 0.05).clamp(0.1, 0.8);
     });
     _updateNodeTransform();
   }
@@ -156,7 +156,7 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
   void _zoomOut() {
     if (webObjectNode == null) return;
     setState(() {
-      _scaleFactor = (_scaleFactor - 0.05).clamp(0.05, 1.0);
+      _scaleFactor = (_scaleFactor - 0.05).clamp(0.1, 0.8);
     });
     _updateNodeTransform();
   }
@@ -184,8 +184,8 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
     setState(() {
       _scaleFactor = 0.2;
       _rotationY = 0.0;
-      // Reseteamos el offset manteniendo el modelo un poco más abajo
-      _offset = vmath.Vector2(0.0, -0.25);
+      // Reseteamos el offset manteniendo el modelo al frente y un poco más abajo
+      _offset = vmath.Vector2(0.0, -0.3);
     });
     _updateNodeTransform();
   }
@@ -208,13 +208,13 @@ class _ArCameraScreenState extends State<ArCameraScreen> {
               if (webObjectNode == null) return;
               setState(() {
                 final newScale = _baseScale * details.scale;
-                _scaleFactor = newScale < 0.05
-                    ? 0.05
-                    : (newScale > 1.5 ? 1.5 : newScale);
+                _scaleFactor = newScale.clamp(0.1, 0.8);
                 _rotationY = _baseRotationY + details.rotation;
                 _offset = vmath.Vector2(
-                  _baseOffset.x + details.focalPointDelta.dx / 300,
-                  _baseOffset.y - details.focalPointDelta.dy / 300,
+                  (_baseOffset.x + details.focalPointDelta.dx / 300)
+                      .clamp(-1.0, 1.0),
+                  (_baseOffset.y - details.focalPointDelta.dy / 300)
+                      .clamp(-1.0, 1.0),
                 );
               });
               _updateNodeTransform();
