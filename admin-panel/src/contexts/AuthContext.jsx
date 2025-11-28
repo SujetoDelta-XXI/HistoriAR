@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AuthContext, rolePermissions } from './authContextConfig';
+import { API_BASE_URL } from '../services/api';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -25,7 +26,6 @@ export function AuthProvider({ children }) {
           }
 
           // Validar token contra el servidor
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
           const response = await fetch(`${API_BASE_URL}/auth/validate`, {
             method: 'GET',
             headers: {
@@ -64,8 +64,7 @@ export function AuthProvider({ children }) {
     setIsLoading(true);
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
