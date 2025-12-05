@@ -1,4 +1,7 @@
 import Monument from '../models/Monument.js';
+import ModelVersion from '../models/ModelVersion.js';
+import HistoricalData from '../models/HistoricalData.js';
+import gcsService from './gcsService.js';
 
 export async function getAllMonuments(filter = {}, { skip = 0, limit = 10, populate = false } = {}) {
   const query = Monument.find(filter).skip(skip).limit(limit);
@@ -22,7 +25,75 @@ export async function updateMonument(id, data) {
 }
 
 export async function deleteMonument(id) {
-  return await Monument.findByIdAndUpdate(id, { status: 'Borrado' }, { new: true });
+  // Find monument first (to get GCS filenames and related info)
+  const monument = await Monument.findById(id);
+  if (!monument) return null;
+
+  // Delete all model versions files and records
+  try {
+    const versions = await ModelVersion.find({ monumentId: id });
+    for (const v of versions) {
+      try {
+        if (v.filename) await gcsService.deleteFile(v.filename);
+      } catch (e) {
+        console.warn('Failed deleting model version file from GCS:', e.message);
+      }
+    }
+    await ModelVersion.deleteMany({ monumentId: id });
+  } catch (e) {
+    console.warn('Error cleaning model versions for monument', id, e.message);
+  }
+
+  // Delete monument image and model files referenced directly on the monument
+  try {
+    if (monument.gcsImageFileName) {
+      try { await gcsService.deleteFile(monument.gcsImageFileName); } catch (e) { console.warn('Failed deleting monument image:', e.message); }
+    }
+    if (monument.gcsModelFileName) {
+      try { await gcsService.deleteFile(monument.gcsModelFileName); } catch (e) { console.warn('Failed deleting monument model file:', e.message); }
+    }
+    // If there's a tiles URL inside our bucket, attempt to delete the file by extracting filename
+    if (monument.model3DTilesUrl && gcsService.bucket && gcsService.bucket.name) {
+      try {
+        const prefix = `https://storage.googleapis.com/${gcsService.bucket.name}/`;
+        if (monument.model3DTilesUrl.startsWith(prefix)) {
+          const filename = monument.model3DTilesUrl.replace(prefix, '');
+          await gcsService.deleteFile(filename);
+        }
+      } catch (e) { console.warn('Failed deleting monument tiles file:', e.message); }
+    }
+  } catch (e) {
+    console.warn('Error cleaning monument direct files for', id, e.message);
+  }
+
+  // Delete historical data images and records
+  try {
+    const historyItems = await HistoricalData.find({ monumentId: id });
+    for (const h of historyItems) {
+      if (h.gcsImageFileName) {
+        try { await gcsService.deleteFile(h.gcsImageFileName); } catch (e) { console.warn('Failed deleting historical image:', e.message); }
+      }
+      if (Array.isArray(h.oldImages)) {
+        for (const imgUrl of h.oldImages) {
+          if (!imgUrl) continue;
+          try {
+            // If oldImages stored full URLs, extract filename
+            let filename = imgUrl;
+            const prefix = `https://storage.googleapis.com/${gcsService.bucket.name}/`;
+            if (filename.startsWith(prefix)) filename = filename.replace(prefix, '');
+            await gcsService.deleteFile(filename);
+          } catch (e) { console.warn('Failed deleting historical old image:', e.message); }
+        }
+      }
+    }
+    await HistoricalData.deleteMany({ monumentId: id });
+  } catch (e) {
+    console.warn('Error cleaning historical data for monument', id, e.message);
+  }
+
+  // Finally delete the monument document
+  const deleted = await Monument.findByIdAndDelete(id);
+  return deleted;
 }
 
 export async function searchMonuments(searchParams, { skip = 0, limit = 10, populate = false } = {}) {

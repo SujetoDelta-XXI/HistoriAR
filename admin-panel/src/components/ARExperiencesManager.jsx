@@ -640,7 +640,7 @@ function ARExperiencesManager() {
               Cerrar
             </Button>
             <Button onClick={() => window.open(modelViewerDialog.modelUrl, '_blank')}>
-              Abrir en Nueva Pestaña
+              Descargar
             </Button>
           </div>
         </DialogContent>

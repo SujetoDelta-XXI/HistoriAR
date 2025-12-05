@@ -18,6 +18,7 @@ import {
   Loader2 
 } from 'lucide-react';
 import PropTypes from 'prop-types';
+import Api from '../services/api';
 
 const ACCEPTED_FORMATS = ['.jpg', '.jpeg', '.png', '.webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -141,7 +142,8 @@ function ImageUpload({
       }, 200);
       
       // Endpoint de API para subida de imágenes (dinámico según el tipo de entidad)
-      const endpoint = `http://localhost:4000/api/${entityType}/upload-image`;
+      // Usar la base URL del servicio API para respetar la configuración de entorno
+      const endpoint = `${Api.baseURL.replace(/\/$/, '')}/${entityType}/upload-image`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
