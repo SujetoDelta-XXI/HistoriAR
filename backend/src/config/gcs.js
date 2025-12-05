@@ -6,6 +6,12 @@ dotenv.config();
 // Initialize Google Cloud Storage
 let storage, bucket;
 
+console.log(">>> DEBUG GCS VARS <<<");
+console.log("GCS_PROJECT_ID:", process.env.GCS_PROJECT_ID);
+console.log("GCS_CLIENT_EMAIL:", process.env.GCS_CLIENT_EMAIL);
+console.log("GCS_PRIVATE_KEY length:", process.env.GCS_PRIVATE_KEY?.length);
+console.log("GCS_BUCKET_NAME:", process.env.GCS_BUCKET_NAME);
+
 try {
   // Create credentials object from environment variables
   const credentials = {

@@ -566,3 +566,61 @@ Para soporte y preguntas:
 **Versión:** 2.0  
 **Última actualización:** Noviembre 9, 2025  
 **Estado:** Producción Ready ✅
+
+
+---
+
+## ☁️ Despliegue en Vercel
+
+Este proyecto está configurado para desplegarse en Vercel como serverless functions.
+
+### Archivos de Configuración
+
+- `api/index.js` - Punto de entrada serverless
+- `vercel.json` - Configuración de Vercel
+- `.vercelignore` - Archivos excluidos del deploy
+
+### Despliegue Rápido
+
+```bash
+# Instalar Vercel CLI
+npm install -g vercel
+
+# Desplegar
+vercel --prod
+```
+
+### Variables de Entorno Requeridas
+
+Configura estas variables en Vercel Dashboard:
+
+```bash
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+GCS_PROJECT_ID=...
+GCS_BUCKET_NAME=...
+GCS_CLIENT_EMAIL=...
+GCS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+### Documentación Completa
+
+Ver `VERCEL_DEPLOYMENT_GUIDE.md` para instrucciones detalladas.
+
+---
+
+## 🔄 Desarrollo Local vs Producción
+
+Este proyecto soporta ambos modos:
+
+**Local:** Usa `src/server.js` con `app.listen()`
+```bash
+npm run dev
+```
+
+**Vercel:** Usa `api/index.js` sin `app.listen()`
+```bash
+vercel --prod
+```
+
+Ver `VERCEL_VS_LOCAL.md` para más detalles sobre las diferencias.

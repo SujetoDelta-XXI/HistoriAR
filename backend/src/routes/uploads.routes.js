@@ -5,6 +5,55 @@ import gcsService from '../services/gcsService.js';
 
 const router = Router();
 
+// Generate signed URL for direct client upload to GCS
+router.post('/signed-url', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { filename, contentType, monumentId } = req.body;
+
+    if (!filename || !contentType) {
+      return res.status(400).json({ error: 'filename and contentType are required' });
+    }
+
+    // Optionally scope filename under monument folder
+    const safeFilename = monumentId ? `models/monuments/${monumentId}/${Date.now()}_${filename}` : `models/${Date.now()}_${filename}`;
+
+    const result = await gcsService.generateV4UploadSignedUrl(safeFilename, contentType, 30);
+
+    res.json({
+      url: result.url,
+      filename: result.filename,
+      message: 'Signed URL generated'
+    });
+  } catch (error) {
+    console.error('Signed URL generation error:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate signed URL' });
+  }
+});
+
+// Client notifies backend that it completed a direct-to-GCS upload.
+// Body: { filename, monumentId, fileSize }
+router.post('/complete', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { filename, monumentId, fileSize } = req.body;
+
+    if (!filename || !monumentId) {
+      return res.status(400).json({ error: 'filename and monumentId are required' });
+    }
+
+    const userId = req.user.id;
+
+    const result = await gcsService.registerUploadedModel(filename, monumentId, fileSize, userId);
+
+    res.json({
+      ...result,
+      message: 'Model upload registered successfully'
+    });
+  } catch (error) {
+    console.error('Upload complete error:', error);
+    res.status(500).json({ error: error.message || 'Failed to register uploaded file' });
+  }
+});
+
 // Upload image to GCS
 router.post('/image', verifyToken, requireRole('admin'), uploadImage.single('image'), async (req, res) => {
   try {

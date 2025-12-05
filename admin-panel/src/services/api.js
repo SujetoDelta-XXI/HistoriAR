@@ -231,34 +231,85 @@ class ApiService {
   }
 
   async uploadModelVersion(monumentId, file) {
-    const formData = new FormData();
-    formData.append('model', file);
+    // If file is large, prefer direct-to-GCS signed URL flow to avoid serverless size limits
+    const DIRECT_UPLOAD_THRESHOLD = 10 * 1024 * 1024; // 10MB
 
     const token = localStorage.getItem('token');
-    const url = `${this.baseURL}/monuments/${monumentId}/upload-model`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        ...(token && { 'Authorization': `Bearer ${token}` })
-      },
-      body: formData,
-    });
 
-    if (!response.ok) {
-      // Handle authentication errors
-      if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.reload();
-        throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+    // If small file, keep existing server-side multipart upload
+    if (file.size <= DIRECT_UPLOAD_THRESHOLD) {
+      const formData = new FormData();
+      formData.append('model', file);
+
+      const url = `${this.baseURL}/monuments/${monumentId}/upload-model`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        // Handle authentication errors
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.reload();
+          throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+        }
+        const error = await response.json().catch(() => ({ message: 'Error de red' }));
+        throw new Error(error.message || `HTTP error! status: ${response.status}`);
       }
-      
-      const error = await response.json().catch(() => ({ message: 'Error de red' }));
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+
+      return response.json();
     }
 
-    return response.json();
+    // Large file -> signed URL flow
+    // 1) Request signed URL from backend
+    const signedRes = await fetch(`${this.baseURL}/uploads/signed-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
+      body: JSON.stringify({ filename: file.name, contentType: file.type, monumentId }),
+    });
+
+    if (!signedRes.ok) {
+      const err = await signedRes.json().catch(() => ({ message: 'Failed to get signed URL' }));
+      throw new Error(err.message || `Signed URL error: ${signedRes.status}`);
+    }
+
+    const { url, filename } = await signedRes.json();
+
+    // 2) PUT the file directly to the signed URL
+    const putRes = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+
+    if (!putRes.ok) {
+      throw new Error('Upload to storage failed');
+    }
+
+    // 3) Notify backend that upload completed so it can create ModelVersion and update Monument
+    const completeRes = await fetch(`${this.baseURL}/uploads/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
+      body: JSON.stringify({ filename, monumentId, fileSize: file.size }),
+    });
+
+    if (!completeRes.ok) {
+      const err = await completeRes.json().catch(() => ({ message: 'Failed to register upload' }));
+      throw new Error(err.message || `Register upload error: ${completeRes.status}`);
+    }
+
+    return completeRes.json();
   }
 
   async activateModelVersion(monumentId, versionId) {

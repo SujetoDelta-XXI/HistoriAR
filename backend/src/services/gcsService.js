@@ -315,6 +315,83 @@ class GCSService {
   }
 
   /**
+   * Generate a V4 signed URL for client direct upload (PUT/write)
+   * @param {string} filename - Destination filename in bucket
+   * @param {string} contentType - MIME type of the file to be uploaded
+   * @param {number} expiresMinutes - Expiration time in minutes
+   * @returns {Promise<{url: string, filename: string}>}
+   */
+  async generateV4UploadSignedUrl(filename, contentType, expiresMinutes = 15) {
+    try {
+      if (!this.bucket) throw new Error('GCS bucket not initialized');
+      const file = this.bucket.file(filename);
+
+      const [url] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + expiresMinutes * 60 * 1000,
+        contentType,
+      });
+
+      return { url, filename };
+    } catch (error) {
+      console.error('Error generating signed URL:', error);
+      throw new Error(`Failed to generate signed URL: ${error.message}`);
+    }
+  }
+
+  /**
+   * Register a model file that was uploaded directly to GCS by the client.
+   * This creates a ModelVersion record and updates the Monument's active model reference.
+   * @param {string} filename - Path of the uploaded file in the bucket
+   * @param {string} monumentId
+   * @param {number} fileSize
+   * @param {string} userId
+   */
+  async registerUploadedModel(filename, monumentId, fileSize, userId) {
+    try {
+      if (!filename) throw new Error('filename is required');
+      if (!monumentId) throw new Error('monumentId is required');
+
+      // Build public URL assuming standard storage.googleapis.com access
+      const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${filename}`;
+
+      // Deactivate previous active version
+      await ModelVersion.updateMany(
+        { monumentId: monumentId, isActive: true },
+        { isActive: false }
+      );
+
+      // Create ModelVersion record
+      const modelVersion = new ModelVersion({
+        monumentId: monumentId,
+        filename: filename,
+        url: publicUrl,
+        uploadedBy: userId,
+        isActive: true,
+        fileSize: fileSize || 0
+      });
+
+      await modelVersion.save();
+
+      // Update Monument's active model reference
+      await Monument.findByIdAndUpdate(monumentId, {
+        model3DUrl: publicUrl,
+        gcsModelFileName: filename
+      });
+
+      return {
+        url: publicUrl,
+        filename,
+        versionId: modelVersion._id
+      };
+    } catch (error) {
+      console.error('Error registering uploaded model:', error);
+      throw new Error(`Failed to register uploaded model: ${error.message}`);
+    }
+  }
+
+  /**
    * Validate file for 3D model upload
    * @param {Object} file - Multer file object
    * @returns {boolean}
