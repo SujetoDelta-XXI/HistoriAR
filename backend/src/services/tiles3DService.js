@@ -16,7 +16,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import gcsService from './gcsService.js';
+import * as s3Service from './s3Service.js';
 import Monument from '../models/Monument.js';
 import ModelVersion from '../models/ModelVersion.js';
 
@@ -134,45 +134,45 @@ class Tiles3DService {
   }
 
   /**
-   * Subir tiles generados a GCS
+   * Subir tiles generados a S3
    * 
    * @param {string} localPath - Ruta local al directorio de tiles
    * @param {string} monumentName - Nombre del monumento
    * @param {string} timestamp - Timestamp para versionado
-   * @returns {Promise<string>} URL del tileset.json en GCS
+   * @returns {Promise<string>} URL del tileset.json en S3
    */
-  async uploadTilesToGCS(localPath, monumentName, timestamp) {
+  async uploadTilesToS3(localPath, monumentName, timestamp) {
     const sanitizedName = monumentName.replace(/[^a-zA-Z0-9]/g, '_');
-    const gcsPath = `models/${sanitizedName}/${timestamp}`;
+    const s3Path = `models/${sanitizedName}/${timestamp}`;
     
     try {
       // Leer todos los archivos del directorio de tiles
       const files = await this.getAllFiles(localPath);
       
-      console.log(`Uploading ${files.length} tile files to GCS...`);
+      console.log(`Uploading ${files.length} tile files to S3...`);
       
       // Subir cada archivo manteniendo la estructura de directorios
       for (const file of files) {
         const relativePath = path.relative(localPath, file);
-        const gcsFilePath = `${gcsPath}/${relativePath}`;
+        const s3Key = `${s3Path}/${relativePath}`;
         
         const fileBuffer = await fs.readFile(file);
         const mimeType = this.getMimeType(file);
         
-        const gcsFile = gcsService.bucket.file(gcsFilePath);
-        await gcsFile.save(fileBuffer, {
-          metadata: { contentType: mimeType }
-        });
+        // Upload to S3
+        await s3Service.uploadFileToS3(fileBuffer, s3Key, mimeType);
       }
       
       // URL del tileset.json principal
-      const tilesetUrl = `https://storage.googleapis.com/${gcsService.bucket.name}/${gcsPath}/tileset.json`;
+      const bucketName = process.env.S3_BUCKET;
+      const region = process.env.AWS_REGION;
+      const tilesetUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Path}/tileset.json`;
       
-      console.log(`✓ Tiles uploaded successfully to ${gcsPath}`);
+      console.log(`✓ Tiles uploaded successfully to S3: ${s3Path}`);
       
       return tilesetUrl;
     } catch (error) {
-      console.error('Error uploading tiles to GCS:', error);
+      console.error('Error uploading tiles to S3:', error);
       throw new Error(`Failed to upload tiles: ${error.message}`);
     }
   }
@@ -228,7 +228,7 @@ class Tiles3DService {
   }
 
   /**
-   * Procesar modelo completo: generar tiles y subir a GCS
+   * Procesar modelo completo: generar tiles y subir a S3
    * 
    * @param {Buffer} fileBuffer - Buffer del archivo GLB/GLTF
    * @param {string} monumentName - Nombre del monumento
@@ -261,8 +261,8 @@ class Tiles3DService {
         return null;
       }
       
-      // Subir tiles a GCS
-      const tilesetUrl = await this.uploadTilesToGCS(tilesDir, monumentName, timestamp);
+      // Subir tiles a S3
+      const tilesetUrl = await this.uploadTilesToS3(tilesDir, monumentName, timestamp);
       
       // Actualizar Monument con URL de tiles
       await Monument.findByIdAndUpdate(monumentId, {

@@ -1,6 +1,6 @@
 import multer from 'multer';
 
-// Configure multer to use memory storage for GCS uploads
+// Configure multer to use memory storage for S3 uploads
 const storage = multer.memoryStorage();
 
 // Image upload configuration

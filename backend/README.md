@@ -6,7 +6,7 @@ Backend API para la aplicación HistoriAR - Sistema de gestión de monumentos hi
 
 - **API RESTful** completa para gestión de monumentos, instituciones, categorías y usuarios
 - **Autenticación JWT** con roles y permisos
-- **Integración con Google Cloud Storage** para archivos multimedia
+- **Integración con AWS S3** para archivos multimedia
 - **Base de datos MongoDB** con Mongoose ODM
 - **Validación de datos** con express-validator
 - **Subida de archivos** con soporte para imágenes y modelos 3D
@@ -17,7 +17,7 @@ Backend API para la aplicación HistoriAR - Sistema de gestión de monumentos hi
 
 - Node.js 18+ 
 - MongoDB 6.0+
-- Cuenta de Google Cloud Platform con Storage habilitado
+- Cuenta de AWS con S3 habilitado
 - npm o yarn
 
 ## 🛠️ Instalación
@@ -41,25 +41,27 @@ cp .env.example .env
 Editar `.env` con tus configuraciones:
 ```env
 # Base de datos
-MONGODB_URI=mongodb://localhost:27017/historiar
+MONGO_URI=mongodb://localhost:27017/historiar
 
 # JWT
 JWT_SECRET=tu_jwt_secret_muy_seguro
 
-# Google Cloud Storage
-GOOGLE_CLOUD_PROJECT_ID=tu-proyecto-gcp
-GOOGLE_CLOUD_BUCKET_NAME=tu-bucket-gcs
-GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_REGION=us-east-1
+S3_BUCKET=historiar-storage
 
 # Servidor
 PORT=4000
 NODE_ENV=development
 ```
 
-4. **Configurar Google Cloud Storage**
-- Crear un bucket en GCS
-- Configurar permisos públicos (ver `docs/GCS_SETUP.md`)
-- Descargar credenciales de service account
+4. **Configurar AWS S3**
+- Crear un bucket en S3
+- Configurar permisos públicos (ver `docs/S3_SETUP.md`)
+- Crear usuario IAM con permisos de S3
+- Obtener Access Key ID y Secret Access Key
 
 5. **Inicializar base de datos**
 ```bash
@@ -171,9 +173,9 @@ npm run test:watch
 
 ## 📖 Documentación Adicional
 
-- [Configuración de GCS](docs/GCS_SETUP.md)
-- [Implementación de Tareas](docs/)
-- [Guía de Migración](scripts/README-migration.md)
+- [Configuración de AWS S3](docs/S3_SETUP.md)
+- [Guía de Migración GCS a S3](docs/MIGRATION_GUIDE.md)
+- [Implementación de 3D Tiles](docs/3D_TILES_SETUP.md)
 
 ## 🤝 Contribución
 
@@ -216,8 +218,8 @@ npm run verify
 Este script verifica:
 - Variables de entorno requeridas
 - Conexión a MongoDB
-- Acceso a Google Cloud Storage
-- Configuración de GCS bucket
+- Acceso a AWS S3
+- Configuración de S3 bucket
 
 #### 2. Ejecutar Migraciones
 
@@ -236,11 +238,11 @@ npm run migrate:institutions
 # Migrar estructura de quizzes
 npm run migrate:quizzes
 
-# Migrar estructura de archivos en GCS
-npm run migrate:gcs-structure
+# Migrar estructura de archivos en S3
+npm run migrate:s3-structure
 ```
 
-**Importante:** Las migraciones de GCS NO eliminan archivos antiguos automáticamente. Verifica que todo funcione antes de eliminar archivos manualmente.
+**Importante:** Las migraciones de S3 NO eliminan archivos antiguos automáticamente. Verifica que todo funcione antes de eliminar archivos manualmente.
 
 #### 3. Crear Índices
 
@@ -293,7 +295,7 @@ Las migraciones NO son reversibles automáticamente. Si necesitas hacer rollback
 
 1. **Instituciones:** Elimina el campo `location` manualmente en MongoDB
 2. **Quizzes:** Restaura backup de la colección
-3. **GCS:** Los archivos antiguos se mantienen, solo actualiza las URLs en Monument
+3. **S3:** Los archivos antiguos se mantienen, solo actualiza las URLs en Monument
 
 **Recomendación:** Siempre haz backup de la base de datos antes de ejecutar migraciones en producción.
 
@@ -332,38 +334,27 @@ Las migraciones NO son reversibles automáticamente. Si necesitas hacer rollback
 
 ```env
 # Base de datos
-MONGODB_URI=mongodb://localhost:27017/historiar
+MONGO_URI=mongodb://localhost:27017/historiar
 
 # JWT
 JWT_SECRET=tu_jwt_secret_muy_seguro
 
-# Google Cloud Storage
-GOOGLE_CLOUD_PROJECT_ID=tu-proyecto-gcp
-GCS_BUCKET_NAME=histori_ar
-GOOGLE_APPLICATION_CREDENTIALS=./config/gcs-key.json
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_REGION=us-east-1
+S3_BUCKET=historiar-storage
 
 # Servidor
 PORT=4000
 NODE_ENV=development
 ```
 
-## 📝 Estructura de Archivos en GCS
+## 📝 Estructura de Archivos en S3
 
-### Antes (Estructura Plana)
+### Estructura Organizada por Monumento
 ```
-histori_ar/
-├── models/
-│   ├── uuid1.glb
-│   ├── uuid2.glb
-│   └── uuid3.glb
-└── images/
-    ├── uuid1.jpg
-    └── uuid2.jpg
-```
-
-### Después (Estructura con Versionado)
-```
-histori_ar/
+historiar-storage/
 ├── models/
 │   ├── Monumento_A/
 │   │   ├── Monumento_A_2024-11-09T10-30-00.glb
@@ -399,14 +390,15 @@ Para documentación completa de los endpoints, consulta:
 
 ## 🐛 Troubleshooting
 
-### Error: "MONGODB_URI not set"
-Asegúrate de tener el archivo `.env` configurado con `MONGODB_URI`.
+### Error: "MONGO_URI not set"
+Asegúrate de tener el archivo `.env` configurado con `MONGO_URI`.
 
-### Error: "GCS bucket not accessible"
+### Error: "S3 bucket not accessible"
 Verifica que:
-1. `GOOGLE_APPLICATION_CREDENTIALS` apunte al archivo de credenciales correcto
-2. El bucket existe en GCP
-3. Las credenciales tienen permisos de lectura/escritura
+1. `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` sean correctos
+2. El bucket existe en AWS S3
+3. Las credenciales tienen permisos de lectura/escritura (PutObject, GetObject, DeleteObject, ListBucket)
+4. La región `AWS_REGION` sea correcta
 
 ### Error en migraciones
 Si una migración falla:
@@ -557,7 +549,7 @@ Para soporte y preguntas:
 ## 🙏 Agradecimientos
 
 - Cesium por 3D Tiles specification
-- Google Cloud Platform por GCS
+- Amazon Web Services por S3
 - MongoDB por la base de datos
 - Comunidad open source
 
@@ -595,12 +587,12 @@ vercel --prod
 Configura estas variables en Vercel Dashboard:
 
 ```bash
-MONGODB_URI=mongodb+srv://...
+MONGO_URI=mongodb+srv://...
 JWT_SECRET=...
-GCS_PROJECT_ID=...
-GCS_BUCKET_NAME=...
-GCS_CLIENT_EMAIL=...
-GCS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-1
+S3_BUCKET=historiar-storage
 ```
 
 ### Documentación Completa

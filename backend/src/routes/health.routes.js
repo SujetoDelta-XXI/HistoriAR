@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { verifyGCSConnection } from '../config/gcs.js';
+import { verifyS3Connection } from '../config/s3.js';
 
 const router = Router();
 
@@ -14,16 +14,16 @@ router.get('/', async (req, res) => {
       timestamp: new Date().toISOString(),
       services: {
         database: 'connected',
-        gcs: 'unknown'
+        s3: 'unknown'
       }
     };
 
-    // Check GCS connection
+    // Check S3 connection
     try {
-      await verifyGCSConnection();
-      healthStatus.services.gcs = 'connected';
+      await verifyS3Connection();
+      healthStatus.services.s3 = 'connected';
     } catch (error) {
-      healthStatus.services.gcs = 'disconnected';
+      healthStatus.services.s3 = 'disconnected';
       healthStatus.status = 'DEGRADED';
     }
 
@@ -39,22 +39,22 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * GCS specific health check
- * GET /api/health/gcs
+ * S3 specific health check
+ * GET /api/health/s3
  */
-router.get('/gcs', async (req, res) => {
+router.get('/s3', async (req, res) => {
   try {
-    await verifyGCSConnection();
+    await verifyS3Connection();
     res.json({
       status: 'OK',
-      message: 'GCS connection verified',
-      bucket: process.env.GCS_BUCKET_NAME,
-      project: process.env.GCS_PROJECT_ID
+      message: 'S3 connection verified',
+      bucket: process.env.S3_BUCKET,
+      region: process.env.AWS_REGION
     });
   } catch (error) {
     res.status(503).json({
       status: 'ERROR',
-      message: 'GCS connection failed',
+      message: 'S3 connection failed',
       error: error.message
     });
   }

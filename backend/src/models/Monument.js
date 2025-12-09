@@ -16,11 +16,11 @@ const MonumentSchema = new mongoose.Schema({
     endYear:   { type: Number }
   },
   culture:      { type: String },
-  imageUrl:     { type: String }, // GCS URL for monument images
-  model3DUrl:   { type: String }, // GCS URL for 3D models
-  model3DTilesUrl: { type: String }, // GCS URL for 3D Tiles tileset.json (opcional)
-  gcsImageFileName: { type: String }, // GCS filename for image deletion
-  gcsModelFileName: { type: String }, // GCS filename for model deletion (renamed from gcsFileName)
+  imageUrl:     { type: String }, // S3 URL for monument images
+  model3DUrl:   { type: String }, // S3 URL for 3D models
+  model3DTilesUrl: { type: String }, // S3 URL for 3D Tiles tileset.json (opcional)
+  s3ImageFileName: { type: String }, // S3 filename for image deletion
+  s3ModelFileName: { type: String }, // S3 filename for model deletion
   institutionId:{ type: mongoose.Schema.Types.ObjectId, ref: 'Institution', index: true },
   status:       { type: String, enum: ['Disponible', 'Oculto', 'Borrado'], default: 'Disponible' },
   createdBy:    { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

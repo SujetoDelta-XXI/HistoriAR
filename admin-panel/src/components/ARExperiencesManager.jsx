@@ -149,11 +149,12 @@ function ARExperiencesManager() {
     try {
       setLoading(true);
       const response = await apiService.getModelVersions(monumentId);
-      const versionsList = response.items || response;
-      setVersions(versionsList);
+      const versionsList = response.versions || response.items || response || [];
+      setVersions(Array.isArray(versionsList) ? versionsList : []);
     } catch (error) {
       console.error('Error loading versions:', error);
       showNotification('error', 'Error al cargar versiones');
+      setVersions([]);
     } finally {
       setLoading(false);
     }

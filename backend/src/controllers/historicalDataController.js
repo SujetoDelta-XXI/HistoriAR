@@ -1,5 +1,5 @@
 import HistoricalData from '../models/HistoricalData.js';
-import gcsService from '../services/gcsService.js';
+import * as s3Service from '../services/s3Service.js';
 
 /**
  * Get all historical data entries for a monument
@@ -59,23 +59,25 @@ export async function createHistoricalData(req, res) {
     }
 
     let imageUrl = null;
-    let gcsImageFileName = null;
+    let s3ImageFileName = null;
 
     // Handle image upload if provided
     if (req.file) {
       try {
-        const result = await gcsService.uploadImageWithVersioning(
+        // TODO: Implement S3 upload for historical data images
+        // For now, use basic S3 upload
+        const timestamp = Date.now();
+        const filename = `historical_${timestamp}_${req.file.originalname}`;
+        
+        imageUrl = await s3Service.uploadFileToS3(
           req.file.buffer,
-          monumentId,
-          req.file.originalname,
-          req.file.mimetype,
-          true // isHistoricalData = true para guardar en subcarpeta fichas
+          `images/historical/${monumentId}/${filename}`,
+          req.file.mimetype
         );
-        imageUrl = result.url;
-        gcsImageFileName = result.filename;
+        s3ImageFileName = filename;
       } catch (uploadError) {
         console.error('Error uploading image:', uploadError);
-        return res.status(500).json({ message: 'Failed to upload image' });
+        return res.status(500).json({ message: 'Failed to upload image to S3' });
       }
     }
 
@@ -92,7 +94,7 @@ export async function createHistoricalData(req, res) {
       title,
       description,
       imageUrl,
-      gcsImageFileName,
+      s3ImageFileName,
       discoveryInfo,
       activities: activities ? JSON.parse(activities) : [],
       sources: sources ? JSON.parse(sources) : [],
@@ -137,24 +139,25 @@ export async function updateHistoricalData(req, res) {
     if (req.file) {
       try {
         // Delete old image if exists
-        if (historicalData.gcsImageFileName) {
-          await gcsService.deleteFile(historicalData.gcsImageFileName);
+        if (historicalData.imageUrl) {
+          await s3Service.deleteFileFromS3(historicalData.imageUrl);
         }
 
-        // Upload new image
-        const result = await gcsService.uploadImageWithVersioning(
+        // Upload new image to S3
+        const timestamp = Date.now();
+        const filename = `historical_${timestamp}_${req.file.originalname}`;
+        
+        const imageUrl = await s3Service.uploadFileToS3(
           req.file.buffer,
-          historicalData.monumentId.toString(),
-          req.file.originalname,
-          req.file.mimetype,
-          true // isHistoricalData = true para guardar en subcarpeta fichas
+          `images/historical/${historicalData.monumentId}/${filename}`,
+          req.file.mimetype
         );
         
-        historicalData.imageUrl = result.url;
-        historicalData.gcsImageFileName = result.filename;
+        historicalData.imageUrl = imageUrl;
+        historicalData.s3ImageFileName = filename;
       } catch (uploadError) {
         console.error('Error uploading image:', uploadError);
-        return res.status(500).json({ message: 'Failed to upload image' });
+        return res.status(500).json({ message: 'Failed to upload image to S3' });
       }
     }
 
@@ -183,13 +186,13 @@ export async function deleteHistoricalData(req, res) {
       return res.status(404).json({ message: 'Historical data not found' });
     }
 
-    // Delete image from GCS if exists
-    if (historicalData.gcsImageFileName) {
+    // Delete image from S3 if exists
+    if (historicalData.imageUrl) {
       try {
-        await gcsService.deleteFile(historicalData.gcsImageFileName);
+        await s3Service.deleteFileFromS3(historicalData.imageUrl);
       } catch (deleteError) {
-        console.error('Error deleting image from GCS:', deleteError);
-        // Continue with deletion even if GCS deletion fails
+        console.error('Error deleting image from S3:', deleteError);
+        // Continue with deletion even if S3 deletion fails
       }
     }
 
