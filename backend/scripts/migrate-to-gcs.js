@@ -175,11 +175,11 @@ async function main() {
   
   try {
     // Connect to database
-    if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI environment variable is required');
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is required');
     }
     
-    await connectDB(process.env.MONGO_URI);
+    await connectDB(process.env.MONGODB_URI);
     
     // Create backup
     const backupCount = await createBackup();

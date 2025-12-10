@@ -19,7 +19,8 @@
     "cors:setup": "node scripts/configureCORS.js",
     "cors:check": "node scripts/checkS3CORS.js",
     "fix:acls": "node scripts/fixS3ACLs.js",
-    "deploy:prepare": "npm run verify && npm run migrate && npm run indexes",
+    "check:env": "node scripts/checkEnvVars.js",
+    "deploy:prepare": "npm run check:env && npm run verify && npm run migrate && npm run indexes",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui"

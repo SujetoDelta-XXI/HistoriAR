@@ -14,7 +14,7 @@ import { verifyS3Connection } from '../src/config/s3.js';
 dotenv.config();
 
 const requiredEnvVars = [
-  'MONGO_URI',
+  'MONGODB_URI',
   'JWT_SECRET',
   'PORT',
   'AWS_ACCESS_KEY_ID',
@@ -42,7 +42,7 @@ async function verifyConfig() {
       hasErrors = true;
     } else {
       // Ocultar valores sensibles
-      const displayValue = ['JWT_SECRET', 'MONGO_URI', 'AWS_SECRET_ACCESS_KEY'].includes(varName) 
+      const displayValue = ['JWT_SECRET', 'MONGODB_URI', 'AWS_SECRET_ACCESS_KEY'].includes(varName) 
         ? '***' 
         : value;
       console.log(`  ✓ ${varName}: ${displayValue}`);
@@ -64,7 +64,7 @@ async function verifyConfig() {
   // Verificar conexión a MongoDB
   console.log('\n📊 Testing MongoDB Connection:');
   try {
-    await mongoose.connect(process.env.MONGO_URI, {
+    await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000
     });
     console.log('  ✓ MongoDB connection successful');

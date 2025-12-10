@@ -16,7 +16,7 @@ dotenv.config();
 async function updateInstitutionSchema() {
   try {
     console.log('🔄 Conectando a MongoDB...');
-    await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Conectado a MongoDB');
 
     console.log('\n📋 Iniciando migración de instituciones...');

@@ -32,8 +32,7 @@ const initializeDB = async () => {
   }
   
   try {
-    const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
-    await connectDB(MONGO_URI);
+    await connectDB(process.env.MONGODB_URI);
     isConnected = true;
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
@@ -44,18 +43,17 @@ const initializeDB = async () => {
 initializeDB();
 
 // CORS configuration
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:4000',
-  // Add your Vercel admin panel URL here after deployment:
-  // 'https://your-admin-panel.vercel.app',
-];
+// Get allowed origins from environment variable or use defaults for development
+const defaultOrigins = process.env.NODE_ENV === 'production' 
+  ? [] 
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4000'];
 
-// Allow additional origins from environment variable
-if (process.env.ALLOWED_ORIGINS) {
-  allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(','));
-}
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : defaultOrigins;
+
+// Log allowed origins for debugging (helpful in production)
+console.log('CORS allowed origins:', allowedOrigins);
 
 const corsOptions = {
   origin: (origin, callback) => {
