@@ -5,6 +5,7 @@
  * Aplica control de permisos para mostrar u ocultar entradas según el rol del usuario.
  * Muestra información del usuario autenticado y opción para cerrar sesión.
  */
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -44,15 +45,11 @@ import {
   Mail,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import PropTypes from 'prop-types';
 
-/**
- * Props:
- * - activeView: string que identifica la vista activa actual.
- * - onViewChange: callback para cambiar la vista al hacer click en un item.
- */
-function AppSidebar({ activeView, onViewChange }) {
+function AppSidebar() {
   const { user, logout, hasPermission } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Definición del árbol de navegación con permisos requeridos por item.
   const navigationItems = [
@@ -60,7 +57,7 @@ function AppSidebar({ activeView, onViewChange }) {
       group: "Principal",
       items: [
         {
-          id: "dashboard",
+          path: "/dashboard",
           title: "Panel Principal",
           icon: LayoutDashboard,
           permission: "dashboard:read",
@@ -71,43 +68,43 @@ function AppSidebar({ activeView, onViewChange }) {
       group: "Gestión de Contenido",
       items: [
         {
-          id: "monuments",
+          path: "/monuments",
           title: "Monumentos",
           icon: Building2,
           permission: "content:read",
         },
         {
-          id: "institutions",
+          path: "/institutions",
           title: "Instituciones",
           icon: MapPin,
           permission: "content:read",
         },
         {
-          id: "categories",
+          path: "/categories",
           title: "Categorías",
           icon: Flag,
           permission: "content:read",
         },
         {
-          id: "quizzes",
+          path: "/ar-experiences",
           title: "Experiencias AR",
           icon: Camera,
           permission: "content:read",
         },
         {
-          id: "tours",
+          path: "/tours",
           title: "Recorridos",
           icon: MapPin,
           permission: "content:read",
         },
         {
-          id: "historical-data",
+          path: "/historical-data",
           title: "Fichas Históricas",
           icon: FileText,
           permission: "content:read",
         },
         {
-          id: "quiz-manager",
+          path: "/quizzes",
           title: "Quizzes",
           icon: HelpCircle,
           permission: "content:read",
@@ -118,13 +115,13 @@ function AppSidebar({ activeView, onViewChange }) {
       group: "Usuarios y Comunicación",
       items: [
         {
-          id: "users",
+          path: "/users",
           title: "Usuarios App",
           icon: Users,
           permission: "users:read",
         },
         {
-          id: "messaging",
+          path: "/messaging",
           title: "Mensajería",
           icon: Mail,
           permission: "messaging:send",
@@ -161,10 +158,10 @@ function AppSidebar({ activeView, onViewChange }) {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
-                  <SidebarMenuItem key={item.id}>
+                  <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
-                      onClick={() => onViewChange(item.id)}
-                      isActive={activeView === item.id}
+                      onClick={() => navigate(item.path)}
+                      isActive={location.pathname === item.path}
                     >
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
@@ -213,8 +210,3 @@ function AppSidebar({ activeView, onViewChange }) {
 }
 
 export default AppSidebar;
-
-AppSidebar.propTypes = {
-  activeView: PropTypes.string.isRequired,
-  onViewChange: PropTypes.func.isRequired,
-};

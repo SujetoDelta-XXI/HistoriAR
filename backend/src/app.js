@@ -17,6 +17,7 @@ import uploadRoutes from './routes/uploads.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import tourRoutes from './routes/tours.routes.js';
 import locationRoutes from './routes/location.routes.js';
+import proxyRoutes from './routes/proxy.routes.js';
 
 config();
 
@@ -95,6 +96,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/tours', tourRoutes);
 app.use('/api/location', locationRoutes);
+app.use('/api/proxy', proxyRoutes);
 
 app.use((req, res) => res.status(404).json({ message: 'Ruta no encontrada' }));
 

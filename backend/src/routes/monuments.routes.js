@@ -13,6 +13,7 @@ import {
   uploadModelVersionController
 } from '../controllers/monumentsController.js';
 import { verifyToken, requireRole } from '../middlewares/auth.js';
+import { uploadMonumentImageToS3 } from '../services/s3Service.js';
 import multer from 'multer';
 
 const router = Router();
@@ -21,7 +22,7 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit (optimized for mobile AR)
   }
 });
 
@@ -62,13 +63,6 @@ router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('i
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
-
-    const { monumentId } = req.body;
-    if (!monumentId) {
-      return res.status(400).json({ error: 'monumentId is required' });
-    }
-
-    const s3Service = await import('../services/s3Service.js');
     
     // Validate image file
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
@@ -85,11 +79,10 @@ router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('i
     const timestamp = Date.now();
     const filename = `${timestamp}_${req.file.originalname}`;
     
-    // Upload to S3
-    const imageUrl = await s3Service.uploadImageToS3(
+    // Upload to S3 in images/monuments/ folder
+    const imageUrl = await uploadMonumentImageToS3(
       req.file.buffer,
       filename,
-      monumentId,
       req.file.mimetype
     );
 

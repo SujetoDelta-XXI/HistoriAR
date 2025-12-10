@@ -5,6 +5,7 @@
  * Flujo: Lista de instituciones → Vista detallada con tours → Formulario de creación
  */
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -35,7 +36,10 @@ const TOUR_TYPES = [
 ];
 
 function ToursManager() {
-  const [view, setView] = useState('institutions'); // 'institutions', 'tours', 'form'
+  const { tourId } = useParams();
+  const navigate = useNavigate();
+  
+  const [view, setView] = useState(tourId ? 'form' : 'institutions'); // 'institutions', 'tours', 'form'
   const [institutions, setInstitutions] = useState([]);
   const [selectedInstitution, setSelectedInstitution] = useState(null);
   const [tours, setTours] = useState([]);

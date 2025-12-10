@@ -5,7 +5,8 @@
  * 1. Monument List View: Lista de monumentos organizados por disponibilidad de modelos
  * 2. Model Version Manager View: Gestión de versiones de modelos 3D para un monumento específico
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -16,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from './ui/dialog';
 import {
   AlertDialog,
@@ -45,8 +47,11 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 import apiService from '../services/api';
 
 function ARExperiencesManager() {
-  // View state management
-  const [view, setView] = useState('list'); // 'list' | 'manage'
+  const { monumentId } = useParams();
+  const navigate = useNavigate();
+  
+  // View state management - determined by URL params
+  const [view, setView] = useState(monumentId ? 'manage' : 'list');
   const [selectedMonument, setSelectedMonument] = useState(null);
   
   // Monument list state
@@ -83,10 +88,88 @@ function ARExperiencesManager() {
     monumentName: null
   });
 
+  // Model loading state
+  const [modelLoading, setModelLoading] = useState(true);
+  
+  // Ref for model-viewer element
+  const modelViewerRef = useRef(null);
+
   // Load monuments on component mount
   useEffect(() => {
     loadMonuments();
   }, []);
+
+  // Load monument and versions when monumentId changes
+  useEffect(() => {
+    if (monumentId) {
+      // Load the specific monument
+      const loadMonumentData = async () => {
+        try {
+          setLoading(true);
+          const response = await apiService.getMonuments();
+          const monumentsList = response.items || response || [];
+          const monument = monumentsList.find(m => m._id === monumentId);
+          
+          if (monument) {
+            setSelectedMonument(monument);
+            setView('manage');
+            await loadVersions(monumentId);
+          } else {
+            showNotification('error', 'Monumento no encontrado');
+            navigate('/ar-experiences');
+          }
+        } catch (error) {
+          console.error('Error loading monument:', error);
+          showNotification('error', 'Error al cargar monumento');
+          navigate('/ar-experiences');
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadMonumentData();
+    } else {
+      setView('list');
+      setSelectedMonument(null);
+      setVersions([]);
+      setShowUpload(false);
+    }
+  }, [monumentId]);
+
+  // Add event listener for model-viewer load event
+  useEffect(() => {
+    if (!modelViewerDialog.open) return;
+    
+    // Always hide loading after 2 seconds as fallback
+    const fallbackTimeout = setTimeout(() => {
+      setModelLoading(false);
+    }, 2000);
+    
+    const modelViewer = modelViewerRef.current;
+    
+    if (modelViewer) {
+      const handleLoad = () => {
+        setModelLoading(false);
+      };
+      
+      const handleProgress = (event) => {
+        if (event.detail && event.detail.totalProgress === 1) {
+          setModelLoading(false);
+        }
+      };
+      
+      modelViewer.addEventListener('load', handleLoad);
+      modelViewer.addEventListener('progress', handleProgress);
+      
+      return () => {
+        modelViewer.removeEventListener('load', handleLoad);
+        modelViewer.removeEventListener('progress', handleProgress);
+        clearTimeout(fallbackTimeout);
+      };
+    } else {
+      return () => clearTimeout(fallbackTimeout);
+    }
+  }, [modelViewerDialog.open, modelViewerDialog.modelUrl]);
 
   // Load monuments and organize by model availability
   const loadMonuments = async () => {
@@ -128,20 +211,12 @@ function ARExperiencesManager() {
 
   // Handle monument selection to navigate to Model Version Manager
   const handleMonumentClick = (monument) => {
-    setSelectedMonument(monument);
-    setView('manage');
-    loadVersions(monument._id);
+    navigate(`/ar-experiences/manage/${monument._id}`);
   };
 
   // Navigate back to monument list
   const handleBackToList = () => {
-    setView('list');
-    setSelectedMonument(null);
-    setVersions([]);
-    setShowUpload(false);
-    setActivationDialog({ open: false, versionId: null, versionName: null });
-    setDeletionDialog({ open: false, versionId: null, versionName: null });
-    loadMonuments(); // Refresh monument list
+    navigate('/ar-experiences');
   };
 
   // Load model versions for selected monument
@@ -230,6 +305,7 @@ function ARExperiencesManager() {
 
   // Open 3D model viewer
   const handleViewModel = (modelUrl) => {
+    setModelLoading(true); // Reset loading state when opening
     setModelViewerDialog({
       open: true,
       modelUrl: modelUrl,
@@ -240,6 +316,7 @@ function ARExperiencesManager() {
   // Close 3D model viewer
   const handleCloseModelViewer = () => {
     setModelViewerDialog({ open: false, modelUrl: null, monumentName: null });
+    setModelLoading(true); // Reset loading state when closing
   };
 
   // Confirm and execute deletion
@@ -623,17 +700,40 @@ function ARExperiencesManager() {
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Vista Previa del Modelo 3D - {modelViewerDialog.monumentName}</DialogTitle>
+            <DialogDescription>
+              Visualiza el modelo 3D en tiempo real. Puedes rotar, hacer zoom y explorar el modelo.
+            </DialogDescription>
           </DialogHeader>
-          <div className="w-full h-[70vh] bg-gray-100 rounded-lg overflow-hidden">
-            {modelViewerDialog.modelUrl && (
-              <model-viewer
-                src={modelViewerDialog.modelUrl}
-                alt="Modelo 3D"
-                auto-rotate
-                camera-controls
-                shadow-intensity="1"
-                style={{ width: '100%', height: '100%' }}
-              />
+          <div className="w-full h-[70vh] bg-gray-100 rounded-lg overflow-hidden relative">
+            {modelViewerDialog.modelUrl ? (
+              <>
+                <model-viewer
+                  ref={modelViewerRef}
+                  src={modelViewerDialog.modelUrl}
+                  alt="Modelo 3D"
+                  auto-rotate
+                  camera-controls
+                  shadow-intensity="1"
+                  style={{ width: '100%', height: '100%' }}
+                  loading="eager"
+                />
+                {modelLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+                    <div className="flex items-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      <span className="ml-2">Cargando modelo 3D...</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center text-muted-foreground flex items-center justify-center h-full">
+                <div>
+                  <Box className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p>No se pudo cargar el modelo 3D</p>
+                  <p className="text-sm mt-2">URL: {modelViewerDialog.modelUrl || 'No disponible'}</p>
+                </div>
+              </div>
             )}
           </div>
           <div className="flex justify-end gap-2 pt-4">

@@ -59,7 +59,7 @@ const handleS3Error = (error) => {
 };
 
 /**
- * Upload image file to S3
+ * Upload image file to S3 (legacy - uses monumentId as folder)
  * @param {Buffer} fileBuffer - File buffer
  * @param {string} fileName - File name
  * @param {string} monumentId - Monument ID for folder organization
@@ -73,6 +73,38 @@ export const uploadImageToS3 = async (fileBuffer, fileName, monumentId, contentT
     const key = `images/${monumentId}/${fileName}`;
 
     console.log(`[S3] Uploading image: ${fileName} to ${key}`);
+
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    });
+
+    await s3Client.send(command);
+    const url = getS3Url(key);
+    
+    console.log(`[S3] Upload successful: ${url}`);
+    return url;
+  } catch (error) {
+    handleS3Error(error);
+  }
+};
+
+/**
+ * Upload monument image to S3 in monuments folder
+ * @param {Buffer} fileBuffer - File buffer
+ * @param {string} fileName - File name
+ * @param {string} contentType - MIME type (default: image/jpeg)
+ * @returns {Promise<string>} Public URL of uploaded file
+ */
+export const uploadMonumentImageToS3 = async (fileBuffer, fileName, contentType = 'image/jpeg') => {
+  try {
+    const s3Client = getS3Client();
+    const bucketName = getBucketName();
+    const key = `images/monuments/${fileName}`;
+
+    console.log(`[S3] Uploading monument image: ${fileName} to ${key}`);
 
     const command = new PutObjectCommand({
       Bucket: bucketName,
