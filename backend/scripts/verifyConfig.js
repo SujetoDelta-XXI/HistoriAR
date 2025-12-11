@@ -8,8 +8,8 @@
  */
 
 import dotenv from 'dotenv';
-import { Storage } from '@google-cloud/storage';
 import mongoose from 'mongoose';
+import { verifyS3Connection } from '../src/config/s3.js';
 
 dotenv.config();
 
@@ -17,13 +17,14 @@ const requiredEnvVars = [
   'MONGODB_URI',
   'JWT_SECRET',
   'PORT',
-  'GCS_BUCKET_NAME',
-  'GCS_PROJECT_ID'
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_REGION',
+  'S3_BUCKET'
 ];
 
 const optionalEnvVars = [
-  'NODE_ENV',
-  'GOOGLE_APPLICATION_CREDENTIALS'
+  'NODE_ENV'
 ];
 
 async function verifyConfig() {
@@ -41,7 +42,7 @@ async function verifyConfig() {
       hasErrors = true;
     } else {
       // Ocultar valores sensibles
-      const displayValue = ['JWT_SECRET', 'MONGODB_URI'].includes(varName) 
+      const displayValue = ['JWT_SECRET', 'MONGODB_URI', 'AWS_SECRET_ACCESS_KEY'].includes(varName) 
         ? '***' 
         : value;
       console.log(`  ✓ ${varName}: ${displayValue}`);
@@ -73,23 +74,14 @@ async function verifyConfig() {
     hasErrors = true;
   }
 
-  // Verificar acceso a GCS
-  console.log('\n☁️  Testing Google Cloud Storage:');
+  // Verificar acceso a AWS S3
+  console.log('\n☁️  Testing AWS S3:');
   try {
-    const storage = new Storage({
-      projectId: process.env.GCS_PROJECT_ID
-    });
-    const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
-    const [exists] = await bucket.exists();
-    
-    if (exists) {
-      console.log(`  ✓ GCS bucket '${process.env.GCS_BUCKET_NAME}' is accessible`);
-    } else {
-      console.error(`  ✗ GCS bucket '${process.env.GCS_BUCKET_NAME}' does not exist`);
-      hasErrors = true;
-    }
+    await verifyS3Connection();
+    console.log(`  ✓ S3 bucket '${process.env.S3_BUCKET}' is accessible`);
+    console.log(`  ✓ AWS Region: ${process.env.AWS_REGION}`);
   } catch (error) {
-    console.error('  ✗ GCS connection failed:', error.message);
+    console.error('  ✗ S3 connection failed:', error.message);
     hasErrors = true;
   }
 

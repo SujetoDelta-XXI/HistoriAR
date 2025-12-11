@@ -6,6 +6,7 @@
  * 2. Quiz Editor View: Gestión de quizzes de un monumento específico
  */
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -25,8 +26,11 @@ import apiService from '../services/api';
 import PropTypes from 'prop-types';
 
 function QuizzesManager() {
-  // View state management
-  const [view, setView] = useState('list'); // 'list' | 'editor'
+  const { monumentId } = useParams();
+  const navigate = useNavigate();
+  
+  // View state management - determined by URL params
+  const [view, setView] = useState(monumentId ? 'editor' : 'list');
   const [selectedMonument, setSelectedMonument] = useState(null);
   
   // Monument list state
@@ -42,6 +46,39 @@ function QuizzesManager() {
   useEffect(() => {
     loadMonuments();
   }, []);
+
+  // Load monument when monumentId changes
+  useEffect(() => {
+    if (monumentId) {
+      const loadMonumentData = async () => {
+        try {
+          setLoading(true);
+          const response = await apiService.getMonuments();
+          const monumentsList = response.items || response || [];
+          const monument = monumentsList.find(m => m._id === monumentId);
+          
+          if (monument) {
+            setSelectedMonument(monument);
+            setView('editor');
+          } else {
+            showNotification('error', 'Monumento no encontrado');
+            navigate('/quizzes');
+          }
+        } catch (error) {
+          console.error('Error loading monument:', error);
+          showNotification('error', 'Error al cargar monumento');
+          navigate('/quizzes');
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadMonumentData();
+    } else {
+      setView('list');
+      setSelectedMonument(null);
+    }
+  }, [monumentId]);
 
   // Load monuments
   const loadMonuments = async () => {
@@ -100,15 +137,12 @@ function QuizzesManager() {
 
   // Handle monument selection
   const handleMonumentClick = (monument) => {
-    setSelectedMonument(monument);
-    setView('editor');
+    navigate(`/quizzes/monument/${monument._id}`);
   };
 
   // Navigate back to monument list
   const handleBackToList = () => {
-    setView('list');
-    setSelectedMonument(null);
-    loadMonuments(); // Refresh counts
+    navigate('/quizzes');
   };
 
   const showNotification = (type, message) => {

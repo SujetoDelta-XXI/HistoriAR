@@ -1,22 +1,25 @@
 import { config } from 'dotenv';
 import app from './app.js';
 import { connectDB } from './config/db.js';
-import { verifyGCSConnection, createFolderStructure } from './config/gcs.js';
+import { initializeS3Client, verifyS3Connection, createFolderStructure } from './config/s3.js';
+import { validateEnvironment } from './config/validateEnv.js';
 
 config();
+
+// Validate environment variables before starting the server
+validateEnvironment();
 
 const PORT = process.env.PORT || 4000;
 
 if (process.env.NODE_ENV !== "production") {
-  const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
-
   (async () => {
-    await connectDB(MONGO_URI);
+    await connectDB(process.env.MONGODB_URI);
     try {
-      await verifyGCSConnection();
+      initializeS3Client();
+      await verifyS3Connection();
       await createFolderStructure();
     } catch (e) {
-      console.warn("⚠️ GCS init fail:", e.message);
+      console.warn("⚠️ S3 init fail:", e.message);
     }
 
     app.listen(PORT, () => {

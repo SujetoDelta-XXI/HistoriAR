@@ -1,138 +1,128 @@
 import { Router } from 'express';
 import { verifyToken, requireRole } from '../middlewares/auth.js';
 import { uploadImage, uploadModel } from '../utils/uploader.js';
-import gcsService from '../services/gcsService.js';
+import * as s3Service from '../services/s3Service.js';
 
 const router = Router();
 
-// Generate signed URL for direct client upload to GCS
-router.post('/signed-url', verifyToken, requireRole('admin'), async (req, res) => {
-  try {
-    const { filename, contentType, monumentId } = req.body;
+// Note: Signed URLs for S3 can be implemented later if needed
+// For now, we use direct uploads through the backend
 
-    if (!filename || !contentType) {
-      return res.status(400).json({ error: 'filename and contentType are required' });
-    }
-
-    // Optionally scope filename under monument folder
-    const safeFilename = monumentId ? `models/monuments/${monumentId}/${Date.now()}_${filename}` : `models/${Date.now()}_${filename}`;
-
-    const result = await gcsService.generateV4UploadSignedUrl(safeFilename, contentType, 30);
-
-    res.json({
-      url: result.url,
-      filename: result.filename,
-      message: 'Signed URL generated'
-    });
-  } catch (error) {
-    console.error('Signed URL generation error:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate signed URL' });
-  }
-});
-
-// Client notifies backend that it completed a direct-to-GCS upload.
-// Body: { filename, monumentId, fileSize }
-router.post('/complete', verifyToken, requireRole('admin'), async (req, res) => {
-  try {
-    const { filename, monumentId, fileSize } = req.body;
-
-    if (!filename || !monumentId) {
-      return res.status(400).json({ error: 'filename and monumentId are required' });
-    }
-
-    const userId = req.user.id;
-
-    const result = await gcsService.registerUploadedModel(filename, monumentId, fileSize, userId);
-
-    res.json({
-      ...result,
-      message: 'Model upload registered successfully'
-    });
-  } catch (error) {
-    console.error('Upload complete error:', error);
-    res.status(500).json({ error: error.message || 'Failed to register uploaded file' });
-  }
-});
-
-// Upload image to GCS
+// Upload image to S3
 router.post('/image', verifyToken, requireRole('admin'), uploadImage.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    // Validate image file
-    gcsService.validateImageFile(req.file);
+    const { monumentId } = req.body;
+    if (!monumentId) {
+      return res.status(400).json({ error: 'monumentId is required' });
+    }
 
-    // Upload to GCS
-    const result = await gcsService.uploadImage(
+    // Validate image file
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Only JPG and PNG images are allowed' });
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (req.file.size > maxSize) {
+      return res.status(400).json({ error: 'Image size must be less than 5MB' });
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const filename = `${timestamp}_${req.file.originalname}`;
+
+    // Upload to S3
+    const imageUrl = await s3Service.uploadImageToS3(
       req.file.buffer,
-      req.file.originalname,
+      filename,
+      monumentId,
       req.file.mimetype
     );
 
     res.json({
-      imageUrl: result.url,
-      filename: result.filename,
-      message: 'Image uploaded successfully'
+      imageUrl,
+      filename,
+      message: 'Image uploaded successfully to S3'
     });
   } catch (error) {
     console.error('Image upload error:', error);
     res.status(500).json({ 
-      error: error.message || 'Failed to upload image' 
+      error: error.message || 'Failed to upload image to S3' 
     });
   }
 });
 
-// Upload 3D model to GCS
+// Upload 3D model to S3
 router.post('/model', verifyToken, requireRole('admin'), uploadModel.single('model'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No 3D model file provided' });
     }
 
-    // Validate 3D model file
-    gcsService.validateModelFile(req.file);
+    const { monumentId } = req.body;
+    if (!monumentId) {
+      return res.status(400).json({ error: 'monumentId is required' });
+    }
 
-    // Upload to GCS
-    const result = await gcsService.uploadModel(
+    // Validate 3D model file
+    const allowedTypes = ['model/gltf-binary', 'application/octet-stream', 'model/gltf+json'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Only GLB and GLTF model files are allowed' });
+    }
+
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (req.file.size > maxSize) {
+      return res.status(400).json({ error: 'Model size must be less than 50MB' });
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const filename = `${timestamp}_${req.file.originalname}`;
+
+    // Upload to S3
+    const modelUrl = await s3Service.uploadModelToS3(
       req.file.buffer,
-      req.file.originalname,
+      filename,
+      monumentId,
       req.file.mimetype
     );
 
     res.json({
-      modelUrl: result.url,
-      filename: result.filename,
-      message: '3D model uploaded successfully'
+      modelUrl,
+      filename,
+      message: '3D model uploaded successfully to S3'
     });
   } catch (error) {
     console.error('3D model upload error:', error);
     res.status(500).json({ 
-      error: error.message || 'Failed to upload 3D model' 
+      error: error.message || 'Failed to upload 3D model to S3' 
     });
   }
 });
 
-// Delete file from GCS
-router.delete('/file/:filename(*)', verifyToken, requireRole('admin'), async (req, res) => {
+// Delete file from S3 by URL
+router.delete('/file', verifyToken, requireRole('admin'), async (req, res) => {
   try {
-    const filename = req.params.filename;
+    const { fileUrl } = req.body;
     
-    if (!filename) {
-      return res.status(400).json({ error: 'Filename is required' });
+    if (!fileUrl) {
+      return res.status(400).json({ error: 'fileUrl is required' });
     }
 
-    await gcsService.deleteFile(filename);
+    await s3Service.deleteFileFromS3(fileUrl);
     
     res.json({ 
-      message: 'File deleted successfully',
-      filename: filename
+      message: 'File deleted successfully from S3',
+      fileUrl
     });
   } catch (error) {
     console.error('File deletion error:', error);
     res.status(500).json({ 
-      error: error.message || 'Failed to delete file' 
+      error: error.message || 'Failed to delete file from S3' 
     });
   }
 });

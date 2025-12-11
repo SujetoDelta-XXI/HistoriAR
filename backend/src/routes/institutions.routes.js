@@ -18,11 +18,19 @@ router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('i
       return res.status(400).json({ error: 'Institution ID is required' });
     }
 
-    const gcsService = (await import('../services/gcsService.js')).default;
+    const s3Service = await import('../services/s3Service.js');
     const Institution = (await import('../models/Institution.js')).default;
     
     // Validate image file
-    gcsService.validateImageFile(req.file);
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Only JPG and PNG images are allowed' });
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (req.file.size > maxSize) {
+      return res.status(400).json({ error: 'Image size must be less than 5MB' });
+    }
 
     // Obtener la institución actual para verificar si tiene imagen previa
     const institution = await Institution.findById(monumentId);
@@ -30,19 +38,13 @@ router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('i
       return res.status(404).json({ error: 'Institution not found' });
     }
 
-    // Si tiene imagen anterior, borrarla de GCS
+    // Si tiene imagen anterior, borrarla de S3
     if (institution.imageUrl) {
       try {
-        // Extraer el nombre del archivo de la URL
-        const oldImagePath = institution.imageUrl.split(`${gcsService.bucket.name}/`)[1];
-        if (oldImagePath) {
-          const oldFile = gcsService.bucket.file(oldImagePath);
-          await oldFile.delete().catch(err => {
-            console.log('Old image not found or already deleted:', err.message);
-          });
-        }
+        await s3Service.deleteFileFromS3(institution.imageUrl);
+        console.log('Old institution image deleted from S3');
       } catch (error) {
-        console.log('Error deleting old image:', error.message);
+        console.log('Error deleting old image from S3:', error.message);
         // Continuar aunque falle el borrado
       }
     }
@@ -50,16 +52,15 @@ router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('i
     // Crear nombre de archivo único: institution_{institutionId}_{timestamp}.ext
     const timestamp = Date.now();
     const extension = req.file.originalname.split('.').pop();
-    const filename = `images/institutions/institution_${monumentId}_${timestamp}.${extension}`;
+    const filename = `institution_${monumentId}_${timestamp}.${extension}`;
     
-    // Upload file to GCS
-    const file = gcsService.bucket.file(filename);
-    await file.save(req.file.buffer, {
-      metadata: { contentType: req.file.mimetype }
-    });
-    
-    // Generate public URL
-    const publicUrl = `https://storage.googleapis.com/${gcsService.bucket.name}/${filename}`;
+    // Upload file to S3 using institutions folder
+    const key = `images/institutions/${filename}`;
+    const publicUrl = await s3Service.uploadFileToS3(
+      req.file.buffer,
+      key,
+      req.file.mimetype
+    );
     
     // Actualizar la institución con la nueva URL
     institution.imageUrl = publicUrl;
@@ -74,7 +75,7 @@ router.post('/upload-image', verifyToken, requireRole('admin'), upload.single('i
   } catch (error) {
     console.error('Error uploading institution image:', error);
     res.status(500).json({ 
-      error: 'Failed to upload image',
+      error: 'Failed to upload image to S3',
       details: error.message 
     });
   }

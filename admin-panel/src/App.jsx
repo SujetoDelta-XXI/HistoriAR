@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import Toaster from './components/ui/sonner';
@@ -19,7 +20,6 @@ import { SidebarProvider, SidebarInset } from './components/ui/sidebar';
 
 function AppContent() {
   const { user, isLoading } = useAuth();
-  const [activeView, setActiveView] = useState('dashboard');
 
   if (isLoading) {
     return (
@@ -36,44 +36,43 @@ function AppContent() {
     return <LoginForm />;
   }
 
-  const renderView = () => {
-    switch (activeView) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'monuments':
-        return <MonumentsManager />;
-      case 'institutions':
-        return <InstitutionsManager />;
-      case 'categories':
-        return <CategoriesManager />;
-      case 'quizzes':
-        return <ARExperiencesManager />;
-      case 'quiz-manager':
-        return <QuizzesManager />;
-      case 'tours':
-        return <ToursManager />;
-      case 'historical-data':
-        return <HistoricalDataManager />;
-      case 'users':
-        return <UsersManager />;
-      case 'messaging':
-        return (
-          <div className="p-6">
-            <h1>Sistema de Mensajería</h1>
-            <p>Funcionalidad en desarrollo...</p>
-          </div>
-        );
-      default:
-        return <Dashboard />;
-    }
-  };
-
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
-        <AppSidebar activeView={activeView} onViewChange={setActiveView} />
+        <AppSidebar />
         <SidebarInset className="flex-1 overflow-auto">
-          {renderView()}
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/monuments" element={<MonumentsManager />} />
+            <Route path="/institutions" element={<InstitutionsManager />} />
+            <Route path="/categories" element={<CategoriesManager />} />
+            
+            {/* AR Experiences with nested routes */}
+            <Route path="/ar-experiences" element={<ARExperiencesManager />} />
+            <Route path="/ar-experiences/manage/:monumentId" element={<ARExperiencesManager />} />
+            
+            {/* Quizzes with nested routes */}
+            <Route path="/quizzes" element={<QuizzesManager />} />
+            <Route path="/quizzes/monument/:monumentId" element={<QuizzesManager />} />
+            
+            {/* Tours with nested routes */}
+            <Route path="/tours" element={<ToursManager />} />
+            <Route path="/tours/edit/:tourId" element={<ToursManager />} />
+            
+            {/* Historical Data with nested routes */}
+            <Route path="/historical-data" element={<HistoricalDataManager />} />
+            <Route path="/historical-data/monument/:monumentId" element={<HistoricalDataManager />} />
+            
+            <Route path="/users" element={<UsersManager />} />
+            <Route path="/messaging" element={
+              <div className="p-6">
+                <h1>Sistema de Mensajería</h1>
+                <p>Funcionalidad en desarrollo...</p>
+              </div>
+            } />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </SidebarInset>
       </div>
     </SidebarProvider>
@@ -82,11 +81,13 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppContent />
-        <Toaster />
-      </ToastProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <ToastProvider>
+          <AppContent />
+          <Toaster />
+        </ToastProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

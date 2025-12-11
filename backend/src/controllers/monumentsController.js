@@ -1,6 +1,6 @@
 import { buildPagination } from '../utils/pagination.js';
 import { getAllMonuments, getMonumentById, createMonument, updateMonument, deleteMonument, searchMonuments, getFilterOptions } from '../services/monumentService.js';
-import gcsService from '../services/gcsService.js';
+import * as s3Service from '../services/s3Service.js';
 
 export async function listMonument(req, res) {
   try {
@@ -29,39 +29,8 @@ export async function createMonumentController(req, res) {
   try {
     const payload = { ...req.body, createdBy: req.user?.sub };
     
-    // Handle image upload to GCS
-    if (req.files?.image?.[0]) {
-      const imageFile = req.files.image[0];
-      try {
-        gcsService.validateImageFile(imageFile);
-        const imageResult = await gcsService.uploadImage(
-          imageFile.buffer,
-          imageFile.originalname,
-          imageFile.mimetype
-        );
-        payload.imageUrl = imageResult.url;
-        payload.gcsImageFileName = imageResult.filename;
-      } catch (uploadError) {
-        return res.status(400).json({ message: `Image upload failed: ${uploadError.message}` });
-      }
-    }
-    
-    // Handle 3D model upload to GCS
-    if (req.files?.model3d?.[0]) {
-      const modelFile = req.files.model3d[0];
-      try {
-        gcsService.validateModelFile(modelFile);
-        const modelResult = await gcsService.uploadModel(
-          modelFile.buffer,
-          modelFile.originalname,
-          modelFile.mimetype
-        );
-        payload.model3DUrl = modelResult.url;
-        payload.gcsModelFileName = modelResult.filename;
-      } catch (uploadError) {
-        return res.status(400).json({ message: `3D model upload failed: ${uploadError.message}` });
-      }
-    }
+    // Note: Image and model uploads should be done through /api/uploads endpoints
+    // This controller only handles monument data creation
     
     const doc = await createMonument(payload);
     res.status(201).json({ id: doc._id });
@@ -89,39 +58,8 @@ export async function updateMonumentController(req, res) {
       }
     }
     
-    // Handle image upload to GCS
-    if (req.files?.image?.[0]) {
-      const imageFile = req.files.image[0];
-      try {
-        gcsService.validateImageFile(imageFile);
-        const imageResult = await gcsService.uploadImage(
-          imageFile.buffer,
-          imageFile.originalname,
-          imageFile.mimetype
-        );
-        data.imageUrl = imageResult.url;
-        data.gcsImageFileName = imageResult.filename;
-      } catch (uploadError) {
-        return res.status(400).json({ message: `Image upload failed: ${uploadError.message}` });
-      }
-    }
-    
-    // Handle 3D model upload to GCS
-    if (req.files?.model3d?.[0]) {
-      const modelFile = req.files.model3d[0];
-      try {
-        gcsService.validateModelFile(modelFile);
-        const modelResult = await gcsService.uploadModel(
-          modelFile.buffer,
-          modelFile.originalname,
-          modelFile.mimetype
-        );
-        data.model3DUrl = modelResult.url;
-        data.gcsModelFileName = modelResult.filename;
-      } catch (uploadError) {
-        return res.status(400).json({ message: `3D model upload failed: ${uploadError.message}` });
-      }
-    }
+    // Note: Image and model uploads should be done through /api/uploads endpoints
+    // This controller only handles monument data updates
     
     const doc = await updateMonument(req.params.id, data);
     if (!doc) return res.status(404).json({ message: 'No encontrado' });
@@ -132,6 +70,15 @@ export async function updateMonumentController(req, res) {
 }
 
 export async function deleteMonumentController(req, res) {
+  try {
+    // Delete associated files from S3 first
+    await s3Service.deleteMonumentFiles(req.params.id);
+    console.log(`[S3] Files deleted for monument: ${req.params.id}`);
+  } catch (s3Error) {
+    // Log error but continue with monument deletion
+    console.error('[S3] Error deleting files:', s3Error.message);
+  }
+  
   const doc = await deleteMonument(req.params.id);
   if (!doc) return res.status(404).json({ message: 'No encontrado' });
   res.json({ message: 'Monumento eliminado', id: doc._id });
@@ -173,9 +120,39 @@ export async function getFilterOptionsController(req, res) {
  */
 export async function getModelVersionsController(req, res) {
   try {
-    const versions = await gcsService.getFileHistory(req.params.id);
-    res.json({ total: versions.length, items: versions });
+    const { id: monumentId } = req.params;
+
+    // Verify monument exists
+    const monument = await getMonumentById(monumentId);
+    if (!monument) {
+      return res.status(404).json({ message: 'Monument not found' });
+    }
+
+    // Import ModelVersion model
+    const ModelVersion = (await import('../models/ModelVersion.js')).default;
+
+    // Get all versions for this monument, sorted by upload date (newest first)
+    const versions = await ModelVersion.find({ monumentId })
+      .populate('uploadedBy', 'name email')
+      .sort({ uploadedAt: -1 });
+
+    res.json({
+      monumentId,
+      monumentName: monument.name,
+      versions: versions.map(v => ({
+        _id: v._id,
+        id: v._id, // Include both for compatibility
+        filename: v.filename,
+        url: v.url,
+        uploadedAt: v.uploadedAt,
+        uploadedBy: v.uploadedBy,
+        isActive: v.isActive,
+        fileSize: v.fileSize,
+        tilesUrl: v.tilesUrl
+      }))
+    });
   } catch (err) {
+    console.error('Error fetching model versions:', err);
     res.status(500).json({ message: err.message });
   }
 }
@@ -185,9 +162,56 @@ export async function getModelVersionsController(req, res) {
  */
 export async function activateModelVersionController(req, res) {
   try {
-    const version = await gcsService.activateVersion(req.params.id, req.params.versionId);
-    res.json({ message: 'Version activated successfully', version });
+    const { id: monumentId, versionId } = req.params;
+
+    // Verify monument exists
+    const monument = await getMonumentById(monumentId);
+    if (!monument) {
+      return res.status(404).json({ message: 'Monument not found' });
+    }
+
+    // Import ModelVersion model
+    const ModelVersion = (await import('../models/ModelVersion.js')).default;
+
+    // Find the version to activate
+    const versionToActivate = await ModelVersion.findOne({
+      _id: versionId,
+      monumentId
+    });
+
+    if (!versionToActivate) {
+      return res.status(404).json({ message: 'Model version not found' });
+    }
+
+    // Deactivate all other versions
+    await ModelVersion.updateMany(
+      { monumentId, isActive: true },
+      { isActive: false }
+    );
+
+    // Activate the selected version
+    versionToActivate.isActive = true;
+    await versionToActivate.save();
+
+    // Update monument with this version's URL
+    await updateMonument(monumentId, {
+      model3DUrl: versionToActivate.url,
+      model3DTilesUrl: versionToActivate.tilesUrl || null,
+      s3ModelFileName: versionToActivate.filename
+    });
+
+    res.json({
+      message: 'Model version activated successfully',
+      version: {
+        id: versionToActivate._id,
+        url: versionToActivate.url,
+        filename: versionToActivate.filename,
+        isActive: versionToActivate.isActive,
+        tilesUrl: versionToActivate.tilesUrl
+      }
+    });
   } catch (err) {
+    console.error('Error activating model version:', err);
     res.status(400).json({ message: err.message });
   }
 }
@@ -197,9 +221,86 @@ export async function activateModelVersionController(req, res) {
  */
 export async function deleteModelVersionController(req, res) {
   try {
-    await gcsService.deleteVersion(req.params.id, req.params.versionId);
-    res.json({ message: 'Version deleted successfully' });
+    const { id: monumentId, versionId } = req.params;
+
+    // Verify monument exists
+    const monument = await getMonumentById(monumentId);
+    if (!monument) {
+      return res.status(404).json({ message: 'Monument not found' });
+    }
+
+    // Import ModelVersion model
+    const ModelVersion = (await import('../models/ModelVersion.js')).default;
+
+    // Find the version to delete
+    const versionToDelete = await ModelVersion.findOne({
+      _id: versionId,
+      monumentId
+    });
+
+    if (!versionToDelete) {
+      return res.status(404).json({ message: 'Model version not found' });
+    }
+
+    // Don't allow deleting the active version if it's the only one
+    if (versionToDelete.isActive) {
+      const versionCount = await ModelVersion.countDocuments({ monumentId });
+      if (versionCount === 1) {
+        return res.status(400).json({ 
+          message: 'Cannot delete the only model version. Upload a new version first.' 
+        });
+      }
+    }
+
+    // Delete file from S3
+    try {
+      await s3Service.deleteFileFromS3(versionToDelete.url);
+      
+      // Delete tiles if they exist
+      if (versionToDelete.tilesUrl) {
+        // Extract the tiles directory path and delete all files
+        // For now, we'll just log it - full implementation would need to list and delete all tile files
+        console.log(`[S3] Tiles deletion for ${versionToDelete.tilesUrl} - implement if needed`);
+      }
+    } catch (s3Error) {
+      console.error('[S3] Error deleting model file:', s3Error.message);
+      // Continue with database deletion even if S3 deletion fails
+    }
+
+    // Delete the version from database
+    await ModelVersion.findByIdAndDelete(versionId);
+
+    // If this was the active version, activate the most recent remaining version
+    if (versionToDelete.isActive) {
+      const latestVersion = await ModelVersion.findOne({ monumentId })
+        .sort({ uploadedAt: -1 });
+      
+      if (latestVersion) {
+        latestVersion.isActive = true;
+        await latestVersion.save();
+        
+        // Update monument with the new active version
+        await updateMonument(monumentId, {
+          model3DUrl: latestVersion.url,
+          model3DTilesUrl: latestVersion.tilesUrl || null,
+          s3ModelFileName: latestVersion.filename
+        });
+      } else {
+        // No versions left, clear monument's model URLs
+        await updateMonument(monumentId, {
+          model3DUrl: null,
+          model3DTilesUrl: null,
+          s3ModelFileName: null
+        });
+      }
+    }
+
+    res.json({ 
+      message: 'Model version deleted successfully',
+      deletedVersionId: versionId
+    });
   } catch (err) {
+    console.error('Error deleting model version:', err);
     res.status(400).json({ message: err.message });
   }
 }
@@ -209,44 +310,104 @@ export async function deleteModelVersionController(req, res) {
  */
 export async function uploadModelVersionController(req, res) {
   try {
-    // Validate that a file was uploaded
+    const { id: monumentId } = req.params;
+    const userId = req.user?.sub || req.user?.id || req.user?._id;
+
     if (!req.file) {
       return res.status(400).json({ message: 'No model file provided' });
     }
 
-    const monumentId = req.params.id;
-    const userId = req.user?.sub || req.user?.id || req.user?._id;
-
-    if (!userId) {
-      console.error('User ID not found in request:', req.user);
-      return res.status(401).json({ message: 'User authentication failed' });
+    // Validate file type
+    const allowedTypes = ['model/gltf-binary', 'application/octet-stream', 'model/gltf+json'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: 'Only GLB and GLTF model files are allowed' });
     }
 
-    // Validate the model file
-    try {
-      gcsService.validateModelFile(req.file);
-    } catch (validationError) {
-      return res.status(400).json({ message: validationError.message });
+    // Validate file size (50MB max)
+    const maxSize = 50 * 1024 * 1024;
+    if (req.file.size > maxSize) {
+      return res.status(400).json({ message: 'Model size must be less than 50MB' });
     }
 
-    // Upload model with versioning
-    const result = await gcsService.uploadModelWithVersioning(
+    // Get monument to verify it exists
+    const monument = await getMonumentById(monumentId);
+    if (!monument) {
+      return res.status(404).json({ message: 'Monument not found' });
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const filename = `${timestamp}_${req.file.originalname}`;
+
+    // Upload to S3
+    const modelUrl = await s3Service.uploadModelToS3(
       req.file.buffer,
+      filename,
       monumentId,
-      req.file.originalname,
-      req.file.mimetype,
-      userId
+      req.file.mimetype
     );
 
+    // Import ModelVersion model
+    const ModelVersion = (await import('../models/ModelVersion.js')).default;
+
+    // Deactivate all previous versions for this monument
+    await ModelVersion.updateMany(
+      { monumentId, isActive: true },
+      { isActive: false }
+    );
+
+    // Create new model version
+    const modelVersion = new ModelVersion({
+      monumentId,
+      filename,
+      url: modelUrl,
+      uploadedBy: userId,
+      isActive: true,
+      fileSize: req.file.size
+    });
+
+    await modelVersion.save();
+
+    // Update monument with new model URL
+    await updateMonument(monumentId, {
+      model3DUrl: modelUrl,
+      s3ModelFileName: filename
+    });
+
+    // Optionally process 3D Tiles (if Cesium tools are installed)
+    const tiles3DService = (await import('../services/tiles3DService.js')).default;
+    try {
+      const tilesetUrl = await tiles3DService.processAndUploadTiles(
+        req.file.buffer,
+        monument.name,
+        monumentId,
+        userId
+      );
+      
+      if (tilesetUrl) {
+        modelVersion.tilesUrl = tilesetUrl;
+        await modelVersion.save();
+      }
+    } catch (tilesError) {
+      console.warn('3D Tiles processing failed (non-critical):', tilesError.message);
+      // Continue without tiles - the GLB model is still available
+    }
+
     res.status(201).json({
-      versionId: result.versionId,
-      url: result.url,
-      filename: result.filename,
-      message: 'Model version uploaded successfully'
+      message: '3D model version uploaded successfully',
+      version: {
+        _id: modelVersion._id,
+        id: modelVersion._id, // Include both for compatibility
+        url: modelUrl,
+        filename,
+        uploadedAt: modelVersion.uploadedAt,
+        isActive: modelVersion.isActive,
+        fileSize: modelVersion.fileSize,
+        tilesUrl: modelVersion.tilesUrl
+      }
     });
   } catch (err) {
     console.error('Error uploading model version:', err);
-    console.error('Error stack:', err.stack);
     res.status(500).json({ message: err.message || 'Internal server error' });
   }
 }

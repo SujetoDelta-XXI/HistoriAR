@@ -17,6 +17,7 @@ import uploadRoutes from './routes/uploads.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import tourRoutes from './routes/tours.routes.js';
 import locationRoutes from './routes/location.routes.js';
+import proxyRoutes from './routes/proxy.routes.js';
 
 config();
 
@@ -31,8 +32,7 @@ const initializeDB = async () => {
   }
   
   try {
-    const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
-    await connectDB(MONGO_URI);
+    await connectDB(process.env.MONGODB_URI);
     isConnected = true;
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
@@ -43,18 +43,17 @@ const initializeDB = async () => {
 initializeDB();
 
 // CORS configuration
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:4000',
-  // Add your Vercel admin panel URL here after deployment:
-  // 'https://your-admin-panel.vercel.app',
-];
+// Get allowed origins from environment variable or use defaults for development
+const defaultOrigins = process.env.NODE_ENV === 'production' 
+  ? [] 
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4000'];
 
-// Allow additional origins from environment variable
-if (process.env.ALLOWED_ORIGINS) {
-  allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(','));
-}
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : defaultOrigins;
+
+// Log allowed origins for debugging (helpful in production)
+console.log('CORS allowed origins:', allowedOrigins);
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -83,6 +82,11 @@ app.use(morgan('dev'));
 
 app.get('/', (_req, res) => res.json({ name: 'HistoriAR API', status: 'ok' }));
 
+// Health check endpoint for AWS ALB/Target Group (simple version)
+app.get('/health', (_req, res) => {
+  res.status(200).send('OK');
+});
+
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -95,6 +99,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/tours', tourRoutes);
 app.use('/api/location', locationRoutes);
+app.use('/api/proxy', proxyRoutes);
 
 app.use((req, res) => res.status(404).json({ message: 'Ruta no encontrada' }));
 
