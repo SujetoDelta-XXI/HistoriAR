@@ -28,16 +28,34 @@ const getS3Url = (key) => {
 };
 
 /**
- * Extract S3 key from URL
- * @param {string} url - S3 URL
- * @returns {string|null} S3 key or null if invalid URL
+ * Extract S3 key from URL or path
+ * @param {string} url - S3 URL or key path
+ * @returns {string|null} S3 key or null if invalid
  */
 const extractKeyFromUrl = (url) => {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
   const bucketName = getBucketName();
   const region = getRegion();
+  
+  // Try to match full S3 URL format
   const urlPattern = new RegExp(`https://${bucketName}\\.s3\\.${region}\\.amazonaws\\.com/(.+)`);
   const match = url.match(urlPattern);
-  return match ? decodeURIComponent(match[1]) : null;
+  
+  if (match) {
+    return decodeURIComponent(match[1]);
+  }
+  
+  // If it's already a key path (starts with images/, models/, etc.), return as is
+  if (url.startsWith('images/') || url.startsWith('models/') || url.startsWith('documents/')) {
+    return url;
+  }
+  
+  // If it's just a filename, we can't determine the full path
+  // Return null to indicate we can't process it
+  return null;
 };
 
 /**
@@ -347,7 +365,7 @@ export const generatePresignedUrl = async (key, expiresIn = null) => {
 
 /**
  * Convert an S3 URL to a pre-signed URL
- * @param {string} s3Url - Original S3 URL
+ * @param {string} s3Url - Original S3 URL or S3 key path
  * @param {number} expiresIn - Expiration time in seconds (optional)
  * @returns {Promise<string|null>} Pre-signed URL or null if invalid URL
  */
@@ -364,7 +382,9 @@ export const convertToPresignedUrl = async (s3Url, expiresIn = null) => {
   const key = extractKeyFromUrl(s3Url);
   if (!key) {
     console.warn(`[S3] Could not extract key from URL: ${s3Url}`);
-    return s3Url; // Return original URL if we can't parse it
+    // If we can't extract a key, return the original value
+    // This prevents breaking the response, but the URL won't work
+    return s3Url;
   }
 
   try {

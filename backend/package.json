@@ -13,6 +13,7 @@
     "migrate:institutions": "node src/migrations/addLocationToInstitutions.js",
     "migrate:quizzes": "node src/migrations/migrateQuizStructure.js",
     "migrate:gcs-structure": "node src/migrations/migrateGCSStructure.js",
+    "migrate:fix-urls": "node src/migrations/fixS3UrlFormats.js",
     "indexes": "node scripts/createIndexes.js",
     "verify": "node scripts/verifyConfig.js",
     "test:s3": "node scripts/testS3Upload.js",
