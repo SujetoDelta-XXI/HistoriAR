@@ -2,9 +2,19 @@ import {
   PutObjectCommand, 
   DeleteObjectCommand, 
   DeleteObjectsCommand, 
-  ListObjectsV2Command 
+  ListObjectsV2Command,
+  GetObjectCommand
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getS3Client, getBucketName, getRegion } from '../config/s3.js';
+
+// Pre-Signed URL expiration times (in seconds)
+const EXPIRATION_TIMES = {
+  image: parseInt(process.env.PRESIGNED_URL_EXPIRATION_IMAGES) || 86400,      // 24 hours
+  model: parseInt(process.env.PRESIGNED_URL_EXPIRATION_MODELS) || 172800,     // 48 hours
+  document: parseInt(process.env.PRESIGNED_URL_EXPIRATION_DOCUMENTS) || 43200, // 12 hours
+  default: parseInt(process.env.PRESIGNED_URL_EXPIRATION_DEFAULT) || 86400    // 24 hours
+};
 
 /**
  * Construct public S3 URL for a given key
@@ -295,4 +305,136 @@ export const uploadFileToS3 = async (fileBuffer, key, contentType) => {
   } catch (error) {
     handleS3Error(error);
   }
+};
+
+
+/**
+ * Generate a pre-signed URL for accessing a private S3 object
+ * @param {string} key - S3 object key
+ * @param {number} expiresIn - Expiration time in seconds (optional)
+ * @returns {Promise<string>} Pre-signed URL
+ */
+export const generatePresignedUrl = async (key, expiresIn = null) => {
+  try {
+    const s3Client = getS3Client();
+    const bucketName = getBucketName();
+
+    // Determine expiration time based on file type if not provided
+    if (!expiresIn) {
+      if (key.startsWith('images/')) {
+        expiresIn = EXPIRATION_TIMES.image;
+      } else if (key.startsWith('models/')) {
+        expiresIn = EXPIRATION_TIMES.model;
+      } else {
+        expiresIn = EXPIRATION_TIMES.default;
+      }
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+
+    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+    
+    console.log(`[S3] Generated presigned URL for ${key}, expires in ${expiresIn}s`);
+    return presignedUrl;
+  } catch (error) {
+    console.error(`[S3] Error generating presigned URL for ${key}:`, error);
+    handleS3Error(error);
+  }
+};
+
+/**
+ * Convert an S3 URL to a pre-signed URL
+ * @param {string} s3Url - Original S3 URL
+ * @param {number} expiresIn - Expiration time in seconds (optional)
+ * @returns {Promise<string|null>} Pre-signed URL or null if invalid URL
+ */
+export const convertToPresignedUrl = async (s3Url, expiresIn = null) => {
+  if (!s3Url || typeof s3Url !== 'string') {
+    return null;
+  }
+
+  // If it's already a presigned URL, return as is
+  if (s3Url.includes('X-Amz-Signature')) {
+    return s3Url;
+  }
+
+  const key = extractKeyFromUrl(s3Url);
+  if (!key) {
+    console.warn(`[S3] Could not extract key from URL: ${s3Url}`);
+    return s3Url; // Return original URL if we can't parse it
+  }
+
+  try {
+    return await generatePresignedUrl(key, expiresIn);
+  } catch (error) {
+    console.error(`[S3] Error converting URL to presigned: ${s3Url}`, error);
+    return s3Url; // Return original URL on error
+  }
+};
+
+/**
+ * Convert all S3 URLs in an object to pre-signed URLs
+ * @param {Object|Array} data - Object or array containing S3 URLs
+ * @param {Array<string>} urlFields - Field names that contain URLs (default: common fields)
+ * @returns {Promise<Object|Array>} Data with presigned URLs
+ */
+export const convertObjectToPresignedUrls = async (data, urlFields = ['imageUrl', 'model3DUrl', 'model3DTilesUrl', 's3ImageFileName', 's3ModelFileName']) => {
+  if (!data) {
+    return data;
+  }
+
+  // Handle arrays
+  if (Array.isArray(data)) {
+    return Promise.all(data.map(item => convertObjectToPresignedUrls(item, urlFields)));
+  }
+
+  // Handle plain objects (including Mongoose documents)
+  if (typeof data === 'object') {
+    // Convert Mongoose document to plain object if needed
+    const plainData = data.toObject ? data.toObject() : { ...data };
+
+    // Convert each URL field
+    for (const field of urlFields) {
+      if (plainData[field] && typeof plainData[field] === 'string') {
+        plainData[field] = await convertToPresignedUrl(plainData[field]);
+      }
+    }
+
+    // Handle nested objects (like monuments array in tours)
+    if (plainData.monuments && Array.isArray(plainData.monuments)) {
+      plainData.monuments = await Promise.all(
+        plainData.monuments.map(async (monument) => {
+          if (monument.monumentId && typeof monument.monumentId === 'object') {
+            monument.monumentId = await convertObjectToPresignedUrls(monument.monumentId, urlFields);
+          }
+          return monument;
+        })
+      );
+    }
+
+    return plainData;
+  }
+
+  return data;
+};
+
+/**
+ * Check if a URL is a presigned URL
+ * @param {string} url - URL to check
+ * @returns {boolean} True if URL is presigned
+ */
+export const isPresignedUrl = (url) => {
+  return url && typeof url === 'string' && url.includes('X-Amz-Signature');
+};
+
+/**
+ * Get expiration time for a file type
+ * @param {string} fileType - File type ('image', 'model', 'document')
+ * @returns {number} Expiration time in seconds
+ */
+export const getExpirationTime = (fileType) => {
+  return EXPIRATION_TIMES[fileType] || EXPIRATION_TIMES.default;
 };

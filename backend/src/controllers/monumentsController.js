@@ -1,6 +1,7 @@
 import { buildPagination } from '../utils/pagination.js';
 import { getAllMonuments, getMonumentById, createMonument, updateMonument, deleteMonument, searchMonuments, getFilterOptions } from '../services/monumentService.js';
 import * as s3Service from '../services/s3Service.js';
+import { convertObjectToPresignedUrls } from '../services/s3Service.js';
 
 export async function listMonument(req, res) {
   try {
@@ -15,14 +16,22 @@ export async function listMonument(req, res) {
     }
     
     const { items, total } = await getAllMonuments(filter, { skip, limit, populate: req.query.populate === 'true' });
-    res.json({ page, total, items });
+    
+    // Convert S3 URLs to presigned URLs
+    const itemsWithPresignedUrls = await convertObjectToPresignedUrls(items);
+    
+    res.json({ page, total, items: itemsWithPresignedUrls });
   } catch (err) { res.status(500).json({ message: err.message }); }
 }
 
 export async function getMonument(req, res) {
   const doc = await getMonumentById(req.params.id, req.query.populate === 'true');
   if (!doc) return res.status(404).json({ message: 'No encontrado' });
-  res.json(doc);
+  
+  // Convert S3 URLs to presigned URLs
+  const docWithPresignedUrls = await convertObjectToPresignedUrls(doc);
+  
+  res.json(docWithPresignedUrls);
 }
 
 export async function createMonumentController(req, res) {
@@ -100,7 +109,10 @@ export async function searchMonumentsController(req, res) {
       populate: req.query.populate === 'true' 
     });
     
-    res.json({ page, total, items });
+    // Convert S3 URLs to presigned URLs
+    const itemsWithPresignedUrls = await convertObjectToPresignedUrls(items);
+    
+    res.json({ page, total, items: itemsWithPresignedUrls });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

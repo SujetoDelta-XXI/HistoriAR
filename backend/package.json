@@ -21,6 +21,7 @@
     "fix:acls": "node scripts/fixS3ACLs.js",
     "check:env": "node scripts/checkEnvVars.js",
     "test:health": "node scripts/testHealthEndpoint.js",
+    "test:presigned": "node scripts/testPresignedUrls.js",
     "deploy:prepare": "npm run check:env && npm run verify && npm run migrate && npm run indexes",
     "test": "vitest --run",
     "test:watch": "vitest",
@@ -40,6 +41,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.946.0",
     "@aws-sdk/lib-storage": "^3.946.0",
+    "@aws-sdk/s3-request-presigner": "^3.948.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
