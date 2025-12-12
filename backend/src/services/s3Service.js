@@ -29,7 +29,7 @@ const getS3Url = (key) => {
 
 /**
  * Extract S3 key from URL or path
- * @param {string} url - S3 URL or key path
+ * @param {string} url - S3 URL, GCS URL, or key path
  * @returns {string|null} S3 key or null if invalid
  */
 const extractKeyFromUrl = (url) => {
@@ -41,11 +41,22 @@ const extractKeyFromUrl = (url) => {
   const region = getRegion();
   
   // Try to match full S3 URL format
-  const urlPattern = new RegExp(`https://${bucketName}\\.s3\\.${region}\\.amazonaws\\.com/(.+)`);
-  const match = url.match(urlPattern);
+  const s3UrlPattern = new RegExp(`https://${bucketName}\\.s3\\.${region}\\.amazonaws\\.com/(.+)`);
+  const s3Match = url.match(s3UrlPattern);
   
-  if (match) {
-    return decodeURIComponent(match[1]);
+  if (s3Match) {
+    return decodeURIComponent(s3Match[1]);
+  }
+  
+  // Try to match Google Cloud Storage URL format (legacy)
+  // Format: https://storage.googleapis.com/bucket_name/path/to/file
+  const gcsUrlPattern = /https:\/\/storage\.googleapis\.com\/[^\/]+\/(.+)/;
+  const gcsMatch = url.match(gcsUrlPattern);
+  
+  if (gcsMatch) {
+    // Extract the path from GCS URL
+    // This will be used to generate a presigned URL for the equivalent S3 path
+    return decodeURIComponent(gcsMatch[1]);
   }
   
   // If it's already a key path (starts with images/, models/, etc.), return as is

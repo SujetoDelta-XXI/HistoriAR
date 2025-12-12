@@ -11,16 +11,26 @@ const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || 'historiar-storage';
 const REGION = process.env.AWS_REGION || 'us-east-2';
 
 /**
- * Convert a partial path or filename to a full S3 URL
+ * Convert a partial path, GCS URL, or filename to a full S3 URL
  */
 function toFullS3Url(value) {
   if (!value || typeof value !== 'string') {
     return value;
   }
 
-  // Already a full URL
-  if (value.startsWith('https://')) {
+  // Already a full S3 URL
+  if (value.startsWith(`https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/`)) {
     return value;
+  }
+
+  // Convert Google Cloud Storage URL to S3 URL
+  // Format: https://storage.googleapis.com/bucket_name/path/to/file
+  const gcsPattern = /https:\/\/storage\.googleapis\.com\/[^\/]+\/(.+)/;
+  const gcsMatch = value.match(gcsPattern);
+  
+  if (gcsMatch) {
+    const path = decodeURIComponent(gcsMatch[1]);
+    return `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/${path}`;
   }
 
   // It's a key path (images/, models/, etc.)
